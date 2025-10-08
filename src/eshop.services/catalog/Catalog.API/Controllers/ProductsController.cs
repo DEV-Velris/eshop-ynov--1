@@ -1,6 +1,7 @@
 using Catalog.API.Features.Products.Commands.CreateProduct;
 using Catalog.API.Features.Products.Commands.UpdateProduct;
 using Catalog.API.Features.Products.Queries.GetProductById;
+using Catalog.API.Features.Products.Queries.GetProductsByCategory;
 using Catalog.API.Models;
 using MediatR;
 using Microsoft.AspNetCore.Mvc;
@@ -44,9 +45,9 @@ public class ProductsController(ISender sender) : ControllerBase
         // TODO
         if (string.IsNullOrWhiteSpace(category))
             return BadRequest("Category is required");
-        
-        var result = await sender.Send(new ());
-        return Ok();
+
+        var result = await sender.Send(new GetProductsByCategoryQuery(category));
+        return Ok(result.Products);
     }
 
     /// <summary>
