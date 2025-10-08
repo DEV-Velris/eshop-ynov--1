@@ -4,6 +4,10 @@ using Marten;
 
 namespace Catalog.API.Features.Products.Queries.GetProductsByCategory;
 
+/// <summary>
+/// Handles the execution of the <see cref="GetProductsByCategoryQuery"/> and retrieves the corresponding
+/// </summary>
+/// <param name="documentSession">The document session</param>
 public class GetProductsByCategoryQueryHandler(IDocumentSession documentSession)
     : IQueryHandler<GetProductsByCategoryQuery, GetProductsByCategoryQueryResult>
 {
