@@ -32,3 +32,17 @@ public class ProductNotFoundException : NotFoundException
     /// </summary>
     public ProductNotFoundException(Guid id) : base("produit", id) { }
 }
+
+/// <summary>
+/// Represents an exception that is thrown when no products are found for a given category.
+/// This exception is used to indicate that the requested category does not contain any products.
+/// </summary>
+public class ProductsNotFoundByCategoryException : NotFoundException
+{
+    /// <summary>
+    /// Represents an exception that is thrown when no products are found for a given category.
+    /// This exception is used to indicate that the requested category does not contain any products.
+    /// </summary>
+    public ProductsNotFoundByCategoryException(string category)
+        : base($"Aucun produit(s) n'a été trouvé(s) pour la catégorie '{category}'") { }
+}
