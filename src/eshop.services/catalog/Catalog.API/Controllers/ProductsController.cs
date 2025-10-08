@@ -1,4 +1,5 @@
 using Catalog.API.Features.Products.Commands.CreateProduct;
+using Catalog.API.Features.Products.Commands.DeleteProduct;
 using Catalog.API.Features.Products.Commands.UpdateProduct;
 using Catalog.API.Features.Products.Queries.GetProductById;
 using Catalog.API.Models;
@@ -104,7 +105,7 @@ public class ProductsController(ISender sender) : ControllerBase
     public async Task<ActionResult<Product>> DeleteProduct(Guid id)
     {
         // TODO
-        var result = await sender.Send(new ());
+        var result = await sender.Send(new DeleteProductCommand { Id = id });
         return Ok();
     }
     
