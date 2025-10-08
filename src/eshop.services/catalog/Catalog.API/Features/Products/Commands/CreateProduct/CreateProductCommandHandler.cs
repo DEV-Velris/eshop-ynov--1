@@ -9,7 +9,8 @@ namespace Catalog.API.Features.Products.Commands.CreateProduct;
 /// <summary>
 /// Handles the CreateProduct command to create a new product in the system by persisting it through the provided document session.
 /// </summary>
-public class CreateProductCommandHandler(IDocumentSession documentSession): ICommandHandler<CreateProductCommand, CreateProductCommandResult>
+public class CreateProductCommandHandler(IDocumentSession documentSession)
+    : ICommandHandler<CreateProductCommand, CreateProductCommandResult>
 {
     /// <summary>
     /// Handles the processing of the CreateProduct command, which adds a new product to the system.
@@ -25,13 +26,13 @@ public class CreateProductCommandHandler(IDocumentSession documentSession): ICom
         var product = request.Adapt<Product>();
 
         var check = await documentSession.Query<Product>()
-            .AnyAsync(x => x.Name.Equals(product.Name, StringComparison.CurrentCultureIgnoreCase),cancellationToken);
+            .AnyAsync(x => x.Name.Equals(product.Name, StringComparison.CurrentCultureIgnoreCase), cancellationToken);
 
-        if(check)
+        if (check)
             throw new ProductAlreadyExistsException(product.Name);
-        
+
         documentSession.Store(product);
-        
+
         await documentSession.SaveChangesAsync(cancellationToken);
 
         return new CreateProductCommandResult(product.Id);
