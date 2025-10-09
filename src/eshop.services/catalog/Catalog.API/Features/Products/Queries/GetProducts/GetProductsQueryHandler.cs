@@ -18,11 +18,34 @@ public class GetProductsQueryHandler(IDocumentSession documentSession) : IQueryH
     /// <returns></returns>
     public async Task<GetProductsQueryResult> Handle(GetProductsQuery request, CancellationToken cancellationToken)
     {
-        var products = await documentSession.Query<Product>()
+
+        var query = documentSession.Query<Product>().AsQueryable();
+
+        if (!string.IsNullOrEmpty(request.Category))
+        {
+            query = query.Where(p => p.Categories.Contains(request.Category));
+        }
+
+        if (!string.IsNullOrEmpty(request.Name))
+        {
+            query = query.Where(p => p.Name.Contains(request.Name, StringComparison.OrdinalIgnoreCase));
+        }
+
+        if (request.MinPrice.HasValue)
+        {
+            query = query.Where(p => p.Price >= request.MinPrice.Value);
+        }
+
+        if (request.MaxPrice.HasValue)
+        {
+            query = query.Where(p => p.Price <= request.MaxPrice.Value);
+        }
+
+        var products = await query
             .Skip((request.PageNumber - 1) * request.PageSize)
             .Take(request.PageSize)
             .ToListAsync(cancellationToken);
-        
+
         return new GetProductsQueryResult(products);
     }
 }

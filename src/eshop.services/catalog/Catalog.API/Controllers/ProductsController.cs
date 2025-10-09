@@ -58,14 +58,35 @@ public class ProductsController(ISender sender) : ControllerBase
     [HttpGet]
     [ProducesResponseType(typeof(IEnumerable<Product>), StatusCodes.Status200OK)]
     public async Task<ActionResult<IEnumerable<Product>>> GetProducts(
-        [FromQuery] int pageNumber
-       , [FromQuery] int pageSize)
+        [FromQuery] int pageNumber,
+        [FromQuery] int pageSize,
+        [FromQuery] string? category = null,
+        [FromQuery] string? name = null,
+        [FromQuery] decimal? minPrice = null,
+        [FromQuery] decimal? maxPrice = null
+    )
+       
     {
+        var providedParameters = Request.Query.Keys;
+
+        // Create list of invalid parameters if not in the accepted list
+        var invalidParameters = providedParameters.Except(
+        [
+            "pageNumber", "pageSize", "category", "name", "minPrice", "maxPrice"
+        ],
+        StringComparer.OrdinalIgnoreCase).ToList();
+
+        if (invalidParameters.Count > 0)
+        {
+            return BadRequest($"Invalid query parameters: {string.Join(", ", invalidParameters)}");
+        }
+
         // By default, return the first page with 10 items if parameters are not provided or invalid
         pageNumber = pageNumber < 1 ? 1 : pageNumber;
         pageSize = pageSize < 1 ? 10 : pageSize;
-        
-        var result = await sender.Send(new GetProductsQuery(pageNumber, pageSize));
+
+        var result = await sender.Send(new GetProductsQuery(pageNumber, pageSize, category, name, minPrice, maxPrice));
+
         return Ok(result.Products);
     }
 
