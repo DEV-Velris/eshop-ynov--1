@@ -19,6 +19,7 @@ public class GetProductsQueryHandler(IDocumentSession documentSession) : IQueryH
     public async Task<GetProductsQueryResult> Handle(GetProductsQuery request, CancellationToken cancellationToken)
     {
 
+        // Create a queryable collection of products from the document session
         var query = documentSession.Query<Product>().AsQueryable();
 
         if (!string.IsNullOrEmpty(request.Category))
