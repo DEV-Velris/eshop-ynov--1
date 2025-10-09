@@ -64,6 +64,16 @@ public class ImportProductsCommandHandler(IDocumentSession documentSession)
                     errorList.Add("Le nom est requis.");
                     continue;
                 }
+                
+                // If name is already used by another product (case insensitive), fail
+                var existingByName = await documentSession.Query<Product>()
+                    .FirstOrDefaultAsync(p => p.Name.ToLower() == name.ToLower(), cancellationToken);
+                if (existingByName is not null && (idText == null || existingByName.Id.ToString() != idText))
+                {
+                    failed++;
+                    errorList.Add($"Le nom '{name}' est déjà utilisé par un autre produit.");
+                    continue;
+                }
 
                 // Price
                 var okPrice = decimal.TryParse(priceText, NumberStyles.Currency, CultureInfo.InvariantCulture, out var price);
