@@ -33,23 +33,15 @@ package "Catalog.API (ASP.NET Core)" {
     }
 
     component "Validation Pipeline" as App_ValidationPipeline <<Behavior>>
-    component "DTO Mapper" as App_DTOMapper <<Mapper>>
   }
 
-  package "Domain" as Dom {
-    component "Product" as D_Product <<Aggregate>>
-    component "Money" as D_Money <<ValueObject>>
-    component "Sku" as D_Sku <<ValueObject>>
-    component "ProductPolicy" as D_ProductPolicy <<DomainService>>
-  }
+  
 
   package "Infrastructure" as Infra {
     component "ProductRepository" as I_ProductRepository <<Repository>>
-    component "UnitOfWork" as I_UnitOfWork <<Tx>>
     component "EF Core DbContext" as I_DbContext <<ORM>>
     database "PostgreSQL\nCatalogDB" as DB_Pg
     component "Migrations" as I_Migrations <<Schema>>
-    component "FileStorage (Images)" as I_FileStorage <<Adapter>>
   }
 }
 
@@ -62,7 +54,7 @@ C_DeleteProductCommand ..> C_DeleteProductHandler : carried by
 
 ' --- Relations internes ---
 C_ProductsController --> App
-App --> Dom
+
 
 Q_GetProductsHandler --> I_ProductRepository
 Q_GetProductByIdHandler --> I_ProductRepository
@@ -78,7 +70,6 @@ I_Migrations ..> DB_Pg
 
 App_ValidationPipeline ..> C
 App_ValidationPipeline ..> Q
-App_DTOMapper ..> D_Product
 
 ' --- Bord du contexte ---
 component "API Gateway" as APIGW
