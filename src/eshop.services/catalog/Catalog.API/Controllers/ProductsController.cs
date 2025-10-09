@@ -34,7 +34,6 @@ public class ProductsController(ISender sender) : ControllerBase
     {
         var result = await sender.Send(new GetProductByIdQuery(id));
         return Ok(result.Product);
-
     }
 
     /// <summary>
@@ -49,7 +48,7 @@ public class ProductsController(ISender sender) : ControllerBase
     {
         if (string.IsNullOrWhiteSpace(category))
             return BadRequest("Category is required");
-        
+
         var result = await sender.Send(new GetProductsByCategoryQuery(category));
         return Ok(result.Products);
     }
@@ -68,16 +67,16 @@ public class ProductsController(ISender sender) : ControllerBase
         [FromQuery] decimal? minPrice = null,
         [FromQuery] decimal? maxPrice = null
     )
-       
+
     {
         var providedParameters = Request.Query.Keys;
 
         // Create list of invalid parameters if not in the accepted list
         var invalidParameters = providedParameters.Except(
-        [
-            "pageNumber", "pageSize", "category", "name", "minPrice", "maxPrice"
-        ],
-        StringComparer.OrdinalIgnoreCase).ToList();
+            [
+                "pageNumber", "pageSize", "category", "name", "minPrice", "maxPrice"
+            ],
+            StringComparer.OrdinalIgnoreCase).ToList();
 
         if (invalidParameters.Count > 0)
         {
@@ -152,14 +151,14 @@ public class ProductsController(ISender sender) : ControllerBase
         {
             return BadRequest("Fichier .xlsx manquant ou vide.");
         }
-        
+
         // Check file extension
         var extension = Path.GetExtension(file.FileName);
         if (!string.Equals(extension, ".xlsx", StringComparison.OrdinalIgnoreCase))
         {
             return BadRequest("Format de fichier non supporté. Veuillez télécharger un fichier .xlsx.");
         }
-        
+
         // Check MIME type
         var allowedTypes = new[]
         {
@@ -170,7 +169,7 @@ public class ProductsController(ISender sender) : ControllerBase
         {
             return BadRequest("Type de fichier non supporté. Veuillez télécharger un fichier .xlsx.");
         }
-        
+
         try
         {
             // Check ZIP signature
@@ -181,7 +180,7 @@ public class ProductsController(ISender sender) : ControllerBase
             {
                 return BadRequest("Le fichier téléchargé n'est pas un fichier .xlsx valide.");
             }
-            
+
             var isZip =
                 hdr[0] == 0x50 && hdr[1] == 0x4B &&
                 (hdr[2] == 0x03 || hdr[2] == 0x05 || hdr[2] == 0x07) &&
@@ -191,7 +190,7 @@ public class ProductsController(ISender sender) : ControllerBase
             {
                 return BadRequest("Le fichier téléchargé n'est pas un fichier .xlsx valide.");
             }
-        
+
             // Check OOXML structure
             stream.Position = 0;
             using var zip = new ZipArchive(stream, ZipArchiveMode.Read, leaveOpen: false);
@@ -204,7 +203,7 @@ public class ProductsController(ISender sender) : ControllerBase
         {
             return BadRequest("Archive .xlsx corrompue ou invalide.");
         }
-        
+
         // Process
         var result = await sender.Send(new ImportProductsCommand(file), ct);
         return Ok(result);
