@@ -4,7 +4,6 @@ WORKDIR /app
 EXPOSE 6060
 
 FROM mcr.microsoft.com/dotnet/sdk:9.0 AS build
-ARG BUILD_CONFIGURATION=Release
 WORKDIR /src
 COPY ["eshop.services/catalog/Catalog.API/Catalog.API.csproj", "eshop.services/catalog/Catalog.API/"]
 RUN dotnet restore "eshop.services/catalog/Catalog.API/Catalog.API.csproj"

@@ -1,0 +1,16 @@
+FROM mcr.microsoft.com/dotnet/sdk:9.0-bookworm-slim
+
+WORKDIR /src
+
+ARG PROJECT_PATH
+ENV PROJECT_PATH=${PROJECT_PATH}
+ARG PROJECT_NAME
+ENV PROJECT_NAME=${PROJECT_NAME}
+ARG SERVICE_API_PORT
+ENV SERVICE_API_PORT=${SERVICE_API_PORT}
+
+RUN mkdir -p ${PROJECT_PATH}
+COPY ./${PROJECT_PATH}/${PROJECT_NAME}.csproj ${PROJECT_PATH}/${PROJECT_NAME}.csproj
+RUN dotnet restore ${PROJECT_PATH}/${PROJECT_NAME}.csproj 
+
+ENTRYPOINT ["sh", "-c", "ls && dotnet watch run --project ${PROJECT_PATH}/${PROJECT_NAME}.csproj --urls http://0.0.0.0:${SERVICE_API_PORT}"]
