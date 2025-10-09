@@ -51,19 +51,12 @@ public class ImportProductsCommandHandler(IDocumentSession documentSession)
             try
             {
                 var idText = row.Table.Columns.Contains("Id") ? row["Id"].ToString() : null;
-                var name = row.Table.Columns.Contains("Name") ? row["Name"].ToString()?.Trim() ?? "" : "";
-                var description = row.Table.Columns.Contains("Description") ? row["Description"].ToString() ?? "" : "";
+                var name = row.Table.Columns.Contains("Name") ? row["Name"].ToString()?.Trim() ?? null : null;
+                var description = row.Table.Columns.Contains("Description") ? row["Description"].ToString() ?? null : null;
                 var priceText = row.Table.Columns.Contains("Price") ? row["Price"].ToString()?.Replace(',', '.') : null;
-                var imageFile = row.Table.Columns.Contains("ImageFile") ? row["ImageFile"].ToString() ?? "" : "";
+                var imageFile = row.Table.Columns.Contains("ImageFile") ? row["ImageFile"].ToString() ?? null : null;
                 var categoriesText =
                     row.Table.Columns.Contains("Categories") ? row["Categories"].ToString() ?? "" : "";
-
-                if (string.IsNullOrWhiteSpace(name))
-                {
-                    failed++;
-                    errorList.Add("Le nom est requis.");
-                    continue;
-                }
                 
                 var existingByName = await documentSession.Query<Product>()
                     .FirstOrDefaultAsync(p => p.Name.Equals(name, StringComparison.CurrentCultureIgnoreCase), cancellationToken);
@@ -96,6 +89,27 @@ public class ImportProductsCommandHandler(IDocumentSession documentSession)
 
                 if (existingProduct is null)
                 {
+                    if (string.IsNullOrWhiteSpace(name))
+                    {
+                        failed++;
+                        errorList.Add("Le nom est requis.");
+                        continue;
+                    }
+
+                    if (string.IsNullOrWhiteSpace(description))
+                    {
+                        failed++;
+                        errorList.Add("La description est requise.");
+                        continue;
+                    }
+
+                    if (imageFile is null)
+                    {
+                        failed++;
+                        errorList.Add("Le nom du fichier image est requis.");
+                        continue;
+                    }
+                    
                     var product = new Product
                     {
                         Id = Guid.NewGuid(),
@@ -112,10 +126,19 @@ public class ImportProductsCommandHandler(IDocumentSession documentSession)
                 else
                 {
                     // Update existing product
-                    existingProduct.Name = name;
-                    existingProduct.Description = description;
+                    if (name is not null)
+                    {
+                        existingProduct.Name = name;
+                    }
+                    if (description is not null)
+                    {
+                        existingProduct.Description = description;
+                    }
                     existingProduct.Price = price;
-                    existingProduct.ImageFile = imageFile;
+                    if (imageFile is not null)
+                    {
+                        existingProduct.ImageFile = imageFile;
+                    }
                     existingProduct.Categories = categories;
                     
                     documentSession.Update(existingProduct);
