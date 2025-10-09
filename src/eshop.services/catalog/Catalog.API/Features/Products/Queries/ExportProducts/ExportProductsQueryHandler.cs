@@ -52,7 +52,6 @@ public class ExportProductsQueryHandler(IDocumentSession documentSession)
         // Format
         ws.Column(4).Style.NumberFormat.Format = "#,##0.00";
         ws.Columns().AdjustToContents();
-        ws.SheetView.FreezeRows(1);
         
         // Save
         using var ms = new MemoryStream();
