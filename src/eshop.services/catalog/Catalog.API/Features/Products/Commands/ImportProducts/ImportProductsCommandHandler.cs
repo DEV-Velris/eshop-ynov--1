@@ -65,9 +65,8 @@ public class ImportProductsCommandHandler(IDocumentSession documentSession)
                     continue;
                 }
                 
-                // If name is already used by another product (case insensitive), fail
                 var existingByName = await documentSession.Query<Product>()
-                    .FirstOrDefaultAsync(p => p.Name.ToLower() == name.ToLower(), cancellationToken);
+                    .FirstOrDefaultAsync(p => p.Name.Equals(name, StringComparison.CurrentCultureIgnoreCase), cancellationToken);
                 if (existingByName is not null && (idText == null || existingByName.Id.ToString() != idText))
                 {
                     failed++;
