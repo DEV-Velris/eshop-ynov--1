@@ -1,9 +1,6 @@
-using System.IO.Compression;
 using Catalog.API.Features.Products.Commands.CreateProduct;
 using Catalog.API.Features.Products.Commands.DeleteProduct;
-using Catalog.API.Features.Products.Commands.ImportProducts;
 using Catalog.API.Features.Products.Commands.UpdateProduct;
-using Catalog.API.Features.Products.Queries.ExportProducts;
 using Catalog.API.Features.Products.Queries.GetProductById;
 using Catalog.API.Features.Products.Queries.GetProducts;
 using Catalog.API.Features.Products.Queries.GetProductsByCategory;
@@ -48,7 +45,7 @@ public class ProductsController(ISender sender) : ControllerBase
     {
         if (string.IsNullOrWhiteSpace(category))
             return BadRequest("Category is required");
-
+        
         var result = await sender.Send(new GetProductsByCategoryQuery(category));
         return Ok(result.Products);
     }
@@ -60,35 +57,13 @@ public class ProductsController(ISender sender) : ControllerBase
     [HttpGet]
     [ProducesResponseType(typeof(IEnumerable<Product>), StatusCodes.Status200OK)]
     public async Task<ActionResult<IEnumerable<Product>>> GetProducts(
-        [FromQuery] int pageNumber,
-        [FromQuery] int pageSize,
-        [FromQuery] string? category = null,
-        [FromQuery] string? name = null,
-        [FromQuery] decimal? minPrice = null,
-        [FromQuery] decimal? maxPrice = null
-    )
-
+        [FromQuery] int pageNumber
+       , [FromQuery] int pageSize
+       , [FromQuery] string? name = null
+       , [FromQuery] decimal? minPrice = null
+       , [FromQuery] decimal? maxPrice = null)
     {
-        var providedParameters = Request.Query.Keys;
-
-        // Create list of invalid parameters if not in the accepted list
-        var invalidParameters = providedParameters.Except(
-            [
-                "pageNumber", "pageSize", "category", "name", "minPrice", "maxPrice"
-            ],
-            StringComparer.OrdinalIgnoreCase).ToList();
-
-        if (invalidParameters.Count > 0)
-        {
-            return BadRequest($"Invalid query parameters: {string.Join(", ", invalidParameters)}");
-        }
-
-        // By default, return the first page with 10 items if parameters are not provided or invalid
-        pageNumber = pageNumber < 1 ? 1 : pageNumber;
-        pageSize = pageSize < 1 ? 10 : pageSize;
-
-        var result = await sender.Send(new GetProductsQuery(pageNumber, pageSize, category, name, minPrice, maxPrice));
-
+        var result = await sender.Send(new GetProductsQuery(pageNumber, pageSize, name, minPrice, maxPrice)); 
         return Ok(result.Products);
     }
 
@@ -131,7 +106,7 @@ public class ProductsController(ISender sender) : ControllerBase
     public async Task<ActionResult<Product>> DeleteProduct(Guid id)
     {
         var result = await sender.Send(new DeleteProductCommand(id));
-        return Ok(result.IsSuccessful);
+        return Ok(result.isSuccessful);
     }
 
     /// <summary>

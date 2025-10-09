@@ -1,51 +1,36 @@
 using BuildingBlocks.CQRS;
+using Catalog.API.Exceptions;
 using Catalog.API.Models;
 using Marten;
+using Marten.Pagination;
 
 namespace Catalog.API.Features.Products.Queries.GetProducts;
 
-/// <summary>
-/// Handles the execution of the <see cref="GetProductsQuery"/> and retrieves the corresponding
-/// </summary>
-/// <param name="documentSession">The document session</param>
-public class GetProductsQueryHandler(IDocumentSession documentSession) : IQueryHandler<GetProductsQuery, GetProductsQueryResult>
+public class GetProductsQueryHandler(IDocumentSession documentSession)
+    : IQueryHandler<GetProductsQuery, GetProductsQueryResult>
 {
-    /// <summary>
-    /// Handles the execution of the GetProductsQuery and retrieves the associated product data.
-    /// </summary>
-    /// <param name="request">Contains the request parameters</param>
-    /// <param name="cancellationToken">The cancellation token</param>
-    /// <returns></returns>
-    public async Task<GetProductsQueryResult> Handle(GetProductsQuery request, CancellationToken cancellationToken)
+    public async Task<GetProductsQueryResult> Handle(GetProductsQuery request,
+        CancellationToken cancellationToken)
     {
-
-        var query = documentSession.Query<Product>().AsQueryable();
-
-        if (!string.IsNullOrEmpty(request.Category))
+        
+        var queryable = documentSession.Query<Product>().AsQueryable();
+            
+        if (request.name is not null)
         {
-            query = query.Where(p => p.Categories.Contains(request.Category));
+            queryable = queryable.Where(x => x.Name.ToLower().Contains(request.name.ToLower()));
         }
-
-        if (!string.IsNullOrEmpty(request.Name))
+        if (request.minPrice is not null)
         {
-            query = query.Where(p => p.Name.Contains(request.Name, StringComparison.OrdinalIgnoreCase));
+            queryable = queryable.Where(x => x.Price >= request.minPrice);
         }
-
-        if (request.MinPrice.HasValue)
+        if (request.maxPrice is not null)
         {
-            query = query.Where(p => p.Price >= request.MinPrice.Value);
+            queryable = queryable.Where(x => x.Price <= request.maxPrice);
         }
+        
+        var productsQuery = await queryable.ToPagedListAsync(request.pageNumber, request.pageSize);
+        
 
-        if (request.MaxPrice.HasValue)
-        {
-            query = query.Where(p => p.Price <= request.MaxPrice.Value);
-        }
-
-        var products = await query
-            .Skip((request.PageNumber - 1) * request.PageSize)
-            .Take(request.PageSize)
-            .ToListAsync(cancellationToken);
-
-        return new GetProductsQueryResult(products);
+        return new GetProductsQueryResult(productsQuery);
     }
 }

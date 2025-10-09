@@ -1,38 +1,29 @@
-using BuildingBlocks.CQRS;
+﻿using BuildingBlocks.CQRS;
 using Catalog.API.Exceptions;
 using Catalog.API.Models;
+using Mapster;
 using Marten;
 
 namespace Catalog.API.Features.Products.Commands.UpdateProduct;
 
-/// <summary>
-/// Handles the UpdateProduct command to update an existing product in the system.
-/// </summary>
-public class UpdateProductCommandHandler(IDocumentSession documentSession) : ICommandHandler<UpdateProductCommand, UpdateProductCommandResult>
+public class UpdateProductCommandHandler(IDocumentSession documentSession): ICommandHandler<UpdateProductCommand, UpdateProductCommandResult>
 {
-    /// <summary>
-    /// Handles the processing of the UpdateProduct command, which updates an existing product in the system.
-    /// </summary>
-    /// <param name="request">The UpdateProduct command containing the details of the product to update</param>
-    /// <param name="cancellationToken">A token that ca be used to cancel operation.</param>
-    /// <returns>A task representing the operation, containing the result of the command</returns>
-    /// <exception cref="ProductNotFoundException">Thrown when a product with the specified ID does not exist in the system.</exception>
-    public async Task<UpdateProductCommandResult> Handle(UpdateProductCommand request, CancellationToken cancellationToken)
+    public async Task<UpdateProductCommandResult> Handle(UpdateProductCommand request,
+        CancellationToken cancellationToken)
     {
-        var productToUpdate = await documentSession.LoadAsync<Product>(request.Id, cancellationToken);
+        var product = await documentSession.Query<Product>()
+            .FirstOrDefaultAsync(x => x.Id == request.Id, cancellationToken);
 
-        if (productToUpdate is null)
-        {
+        if (product == null)
             throw new ProductNotFoundException(request.Id);
-        }
+
+        product.Name = request.Name;
+        product.Description = request.Description;
+        product.Price = request.Price;
+        product.Categories = request.Categories;
+        product.ImageFile = request.ImageFile;
         
-        productToUpdate.Name = request.Name;
-        productToUpdate.Description = request.Description;
-        productToUpdate.Price = request.Price;
-        productToUpdate.ImageFile = request.ImageFile;
-        productToUpdate.Categories = request.Categories;
-        
-        documentSession.Update(productToUpdate);
+        documentSession.Update(product);
         await documentSession.SaveChangesAsync(cancellationToken);
         
         return new UpdateProductCommandResult(true);
