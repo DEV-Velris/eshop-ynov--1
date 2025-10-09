@@ -3,6 +3,7 @@ using Catalog.API.Features.Products.Commands.CreateProduct;
 using Catalog.API.Features.Products.Commands.DeleteProduct;
 using Catalog.API.Features.Products.Commands.ImportProducts;
 using Catalog.API.Features.Products.Commands.UpdateProduct;
+using Catalog.API.Features.Products.Queries.ExportProducts;
 using Catalog.API.Features.Products.Queries.GetProductById;
 using Catalog.API.Features.Products.Queries.GetProducts;
 using Catalog.API.Features.Products.Queries.GetProductsByCategory;
@@ -207,5 +208,14 @@ public class ProductsController(ISender sender) : ControllerBase
         // Process
         var result = await sender.Send(new ImportProductsCommand(file), ct);
         return Ok(result);
+    }
+
+    [HttpGet("export")]
+    [Produces("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    public async Task<IActionResult> ExportProducts(CancellationToken ct)
+    {
+        var result = await sender.Send(new ExportProductsQuery(), ct);
+        return File(result.Content, result.ContentType, result.FileName);
     }
 }
