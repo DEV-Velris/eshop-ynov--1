@@ -1,5 +1,8 @@
+using Basket.API.Features.Baskets.Commands.AddItemToBasket;
 using Basket.API.Features.Baskets.Commands.CreateBasket;
 using Basket.API.Features.Baskets.Commands.DeleteBasket;
+using Basket.API.Features.Baskets.Commands.RemoveItemFromBasket;
+using Basket.API.Features.Baskets.Commands.UpdateBasket;
 using Basket.API.Features.Baskets.Queries.GetBasketByUserName;
 using Basket.API.Models;
 using MediatR;
@@ -14,7 +17,7 @@ namespace Basket.API.Controllers;
 [ApiController]
 [Route("[controller]/{userName}")]
 [Produces("application/json")]
-public class BasketsController (ISender sender) : ControllerBase
+public class BasketsController(ISender sender) : ControllerBase
 {
     /// <summary>
     /// Retrieves the shopping basket for the specified user.
@@ -57,9 +60,34 @@ public class BasketsController (ISender sender) : ControllerBase
         var result = await sender.Send(new DeleteBasketCommand(userName));
         return Ok(result.IsSuccess);
     }
-    
+
     // TODO Update basket product quantity
-    
+    [HttpPut]
+    [ProducesResponseType(typeof(UpdateBasketCommandResult), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(NotFoundObjectResult), StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<UpdateBasketCommandResult>> UpdateBasket(string userName, [FromBody] ShoppingCartItem item)
+    {
+        var result = await sender.Send(new UpdateBasketCommand(userName, item));
+        return Ok(result);
+    }
+
     //TODO Delete item in user basket
-    
+    [HttpDelete("item/{productId}")]
+    [ProducesResponseType(typeof(ShoppingCart), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(NotFoundObjectResult), StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<ShoppingCart>> RemoveItemFromBasket(string userName, string productId)
+    {
+        var result = await sender.Send(new RemoveItemFromBasketCommand(userName, productId, true));
+        return Ok(result.IsSuccess);
+    }
+
+    //TODO Add item in user basket
+    [HttpPost("item")]
+    [ProducesResponseType(typeof(ShoppingCart), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(NotFoundObjectResult), StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<ShoppingCart>> AddItemToBasket(string userName, [FromBody] ShoppingCartItem basketItem)
+    {
+        var result = await sender.Send(new AddItemToBasketCommand(userName, basketItem));
+        return Ok(result.ShoppingCart);
+    }
 }
