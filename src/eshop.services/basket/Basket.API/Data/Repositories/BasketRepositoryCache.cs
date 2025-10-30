@@ -64,7 +64,7 @@ public class BasketRepositoryCache(IBasketRepository repository, IDistributedCac
             return cachedBasket;
             
         var basket = await repository.GetBasketByUserNameAsync(userName, cancellationToken);
-        await cache.SetObjectAsync(cacheKey, basket, CacheOptions, cancellationToken);
+        await cache.SetObjectAsync(cacheKey, basket, cancellationToken);
         return basket;
     }
 
@@ -79,7 +79,7 @@ public class BasketRepositoryCache(IBasketRepository repository, IDistributedCac
     {
         var createdBasket = await repository.CreateBasketAsync(basket, cancellationToken);
         var cacheKey = GenerateKey(basket.UserName);
-        await cache.SetObjectAsync(cacheKey, createdBasket, CacheOptions, cancellationToken);
+        await cache.SetObjectAsync(cacheKey, createdBasket, cancellationToken);
         return createdBasket;
     }
 

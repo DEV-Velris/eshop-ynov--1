@@ -34,9 +34,9 @@ public class BasketRepository(IDocumentSession session) : IBasketRepository
         CancellationToken cancellationToken = default)
     {
         var basket = await session.LoadAsync<ShoppingCart>(userName, cancellationToken);
-        if (basket is null)
+        if(basket is null)
             throw new BasketNotFoundException(userName);
-
+        
         return basket;
     }
 
@@ -48,7 +48,7 @@ public class BasketRepository(IDocumentSession session) : IBasketRepository
     /// <returns>The created shopping cart instance.</returns>
     public async Task<ShoppingCart> CreateBasketAsync(ShoppingCart basket,
         CancellationToken cancellationToken = default)
-    {
+    { 
         session.Store(basket);
         await session.SaveChangesAsync(cancellationToken);
         return basket;

@@ -29,7 +29,7 @@ public static class DistributedCacheExtensions
 
     /// <summary>
     /// Stores an object of type <typeparamref name="T"/> in the distributed cache
-    /// under the specified key after serializing it, with specified cache options.
+    /// under the specified key after serializing it.
     /// </summary>
     /// <typeparam name="T">The type of the object to store in the cache.</typeparam>
     /// <param name="cache">The distributed cache instance to store the item in.</param>
@@ -39,12 +39,12 @@ public static class DistributedCacheExtensions
     /// <param name="token">A cancellation token to observe while waiting for the task to complete.</param>
     /// <returns>
     /// A task that represents the asynchronous operation of storing the serialized object
-    /// in the cache with the specified options.
+    /// in the cache.
     /// </returns>
     public static Task SetObjectAsync<T>(this IDistributedCache cache, string key, T value,
-        DistributedCacheEntryOptions options, CancellationToken token = default)
+        CancellationToken token = default)
     {
         var data = JsonSerializer.SerializeToUtf8Bytes(value);
-        return cache.SetAsync(key, data, options, token);
+        return cache.SetAsync(key, data, token);
     }
 }

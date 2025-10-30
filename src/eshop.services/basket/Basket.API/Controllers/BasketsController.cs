@@ -17,7 +17,7 @@ namespace Basket.API.Controllers;
 [ApiController]
 [Route("[controller]/{userName}")]
 [Produces("application/json")]
-public class BasketsController(ISender sender) : ControllerBase
+public class BasketsController (ISender sender) : ControllerBase
 {
     /// <summary>
     /// Retrieves the shopping basket for the specified user.
@@ -60,7 +60,7 @@ public class BasketsController(ISender sender) : ControllerBase
         var result = await sender.Send(new DeleteBasketCommand(userName));
         return Ok(result.IsSuccess);
     }
-
+    
     // TODO Update basket product quantity
     [HttpPut]
     [ProducesResponseType(typeof(UpdateBasketCommandResult), StatusCodes.Status200OK)]
