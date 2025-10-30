@@ -1,6 +1,9 @@
+using System.IO.Compression;
 using Catalog.API.Features.Products.Commands.CreateProduct;
 using Catalog.API.Features.Products.Commands.DeleteProduct;
+using Catalog.API.Features.Products.Commands.ImportProducts;
 using Catalog.API.Features.Products.Commands.UpdateProduct;
+using Catalog.API.Features.Products.Queries.ExportProducts;
 using Catalog.API.Features.Products.Queries.GetProductById;
 using Catalog.API.Features.Products.Queries.GetProducts;
 using Catalog.API.Features.Products.Queries.GetProductsByCategory;
