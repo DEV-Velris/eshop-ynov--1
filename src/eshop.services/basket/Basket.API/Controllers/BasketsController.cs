@@ -61,7 +61,6 @@ public class BasketsController(ISender sender) : ControllerBase
         return Ok(result.IsSuccess);
     }
 
-    // TODO Update basket product quantity
     [HttpPut]
     [ProducesResponseType(typeof(UpdateBasketCommandResult), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(NotFoundObjectResult), StatusCodes.Status404NotFound)]
@@ -71,7 +70,6 @@ public class BasketsController(ISender sender) : ControllerBase
         return Ok(result);
     }
 
-    //TODO Delete item in user basket
     [HttpDelete("item/{productId}")]
     [ProducesResponseType(typeof(ShoppingCart), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(NotFoundObjectResult), StatusCodes.Status404NotFound)]
@@ -81,7 +79,6 @@ public class BasketsController(ISender sender) : ControllerBase
         return Ok(result.IsSuccess);
     }
 
-    //TODO Add item in user basket
     [HttpPost("item")]
     [ProducesResponseType(typeof(ShoppingCart), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(NotFoundObjectResult), StatusCodes.Status404NotFound)]
