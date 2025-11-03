@@ -19,6 +19,11 @@ public class BasketRepositoryCache(IBasketRepository repository, IDistributedCac
     /// </summary>
     private const string PrefixKey = "basket";
 
+    private static readonly DistributedCacheEntryOptions CacheOptions = new()
+    {
+        AbsoluteExpirationRelativeToNow = TimeSpan.FromHours(1),
+    };
+
     /// <summary>
     /// Generates a unique cache key for storing and retrieving user-specific basket data.
     /// Combines a predefined prefix with the provided user name to ensure uniqueness.
@@ -59,7 +64,7 @@ public class BasketRepositoryCache(IBasketRepository repository, IDistributedCac
             return cachedBasket;
             
         var basket = await repository.GetBasketByUserNameAsync(userName, cancellationToken);
-        await cache.SetObjectAsync(cacheKey, basket, cancellationToken);
+        await cache.SetObjectAsync(cacheKey, basket, CacheOptions, cancellationToken);
         return basket;
     }
 
@@ -74,7 +79,38 @@ public class BasketRepositoryCache(IBasketRepository repository, IDistributedCac
     {
         var createdBasket = await repository.CreateBasketAsync(basket, cancellationToken);
         var cacheKey = GenerateKey(basket.UserName);
-        await cache.SetObjectAsync(cacheKey, createdBasket, cancellationToken);
+        await cache.SetObjectAsync(cacheKey, createdBasket, CacheOptions, cancellationToken);
         return createdBasket;
+    }
+
+    /// <summary>
+    /// Updates an existing shopping cart in the cache and underlying repository.
+    /// Ensures that both the cached and persistent data are synchronized after the update operation.
+    /// </summary>
+    /// <param name="basket">The shopping cart to be updated.</param>
+    /// <param name="cancellationToken">A token to observe while waiting for the operation to complete.</param>
+    /// <returns>The updated shopping cart instance.</returns>
+    public async Task<ShoppingCart> UpdateBasketAsync(string userName, ShoppingCartItem item, CancellationToken cancellationToken = default)
+    {
+        var updatedBasket = await repository.UpdateBasketAsync(userName, item, cancellationToken);
+        var cacheKey = GenerateKey(userName);
+        await cache.SetObjectAsync(cacheKey, updatedBasket, CacheOptions, cancellationToken);
+        return updatedBasket;
+    }
+
+    public async Task<ShoppingCart> RemoveItemFromBasketAsync(string userName, string productId, CancellationToken cancellationToken = default)
+    {
+        var updatedBasket = await repository.RemoveItemFromBasketAsync(userName, productId, cancellationToken);
+        var cacheKey = GenerateKey(userName);
+        await cache.SetObjectAsync(cacheKey, updatedBasket, CacheOptions, cancellationToken);
+        return updatedBasket;
+    }
+
+    public async Task<ShoppingCart> AddItemToBasketAsync(string userName, ShoppingCartItem item, CancellationToken cancellationToken = default)
+    {
+        var updatedBasket = await repository.AddItemToBasketAsync(userName, item, cancellationToken);
+        var cacheKey = GenerateKey(userName);
+        await cache.SetObjectAsync(cacheKey, updatedBasket, CacheOptions, cancellationToken);
+        return updatedBasket;
     }
 }
