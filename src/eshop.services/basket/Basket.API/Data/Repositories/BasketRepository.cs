@@ -102,7 +102,7 @@ public class BasketRepository(IDocumentSession session) : IBasketRepository
         }
         else
         {
-            basket.Items = [.. basket.Items.Where(x => x.ProductId != itemToRemove.ProductId)];
+            basket.Items.Remove(itemToRemove);
         }
 
         session.Store(basket);
@@ -130,7 +130,7 @@ public class BasketRepository(IDocumentSession session) : IBasketRepository
         }
         else
         {
-            existingBasket.Items = [.. existingBasket.Items, item];
+            existingBasket.Items.Add(item);
         }
 
         session.Store(existingBasket);

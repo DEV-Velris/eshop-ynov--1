@@ -1,6 +1,7 @@
 using BuildingBlocks.Behaviors;
 using BuildingBlocks.Middlewares;
 using Catalog.API.Data;
+using Discount.Grpc;
 using FluentValidation;
 using HealthChecks.UI.Client;
 using Marten;
@@ -43,6 +44,21 @@ builder.Services.AddHealthChecks()
 
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
 builder.Services.AddOpenApi();
+
+builder.Services.AddGrpcClient<DiscountProtoService.DiscountProtoServiceClient>(options =>
+{
+    options.Address = new Uri(configuration.GetValue<string>("GrpcSettings:DiscountUrl") ?? string.Empty);
+}).ConfigurePrimaryHttpMessageHandler(() =>
+{
+    var handler = new HttpClientHandler();
+
+    if (builder.Environment.IsDevelopment())
+    {
+        handler.ServerCertificateCustomValidationCallback = HttpClientHandler.DangerousAcceptAnyServerCertificateValidator;
+    }
+
+    return handler;
+});
 
 var app = builder.Build();
 

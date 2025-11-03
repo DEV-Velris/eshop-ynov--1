@@ -5,13 +5,25 @@ namespace Basket.API.Models;
 /// </summary>
 public class ShoppingCartItem
 {
-    public int Quantity {get;set;}
+    public int Quantity { get; set; }
 
     public string Color { get; set; } = string.Empty;
-    
-    public string ProductName {get;set;} = string.Empty;
-    
-    public decimal Price {get;set;}
-    
-    public Guid ProductId {get;set;}
+
+    public string ProductName { get; set; } = string.Empty;
+
+    /// <summary>
+    ///     Gets or sets the price provided by the catalog before applying any discount.
+    /// </summary>
+    public decimal OriginalPrice { get; set; }
+
+    /// <summary>
+    ///     Gets or sets the final unit price after applying the discount service rules.
+    /// </summary>
+    public decimal Price { get; set; }
+
+    public Guid ProductId { get; set; }
+
+    public List<string> Categories { get; set; } = [];
+
+    public List<ShoppingCartItemDiscount> AppliedDiscounts { get; set; } = [];
 }

@@ -1,5 +1,7 @@
 using BuildingBlocks.CQRS;
 using Catalog.API.Models;
+using Discount.Grpc;
+using Microsoft.Extensions.Logging;
 using Marten;
 
 namespace Catalog.API.Features.Products.Queries.GetProducts;
@@ -8,7 +10,7 @@ namespace Catalog.API.Features.Products.Queries.GetProducts;
 /// Handles the execution of the <see cref="GetProductsQuery"/> and retrieves the corresponding
 /// </summary>
 /// <param name="documentSession">The document session</param>
-public class GetProductsQueryHandler(IDocumentSession documentSession) : IQueryHandler<GetProductsQuery, GetProductsQueryResult>
+public class GetProductsQueryHandler(IDocumentSession documentSession, DiscountProtoService.DiscountProtoServiceClient discountClient, ILogger<GetProductsQueryHandler> logger) : IQueryHandler<GetProductsQuery, GetProductsQueryResult>
 {
     /// <summary>
     /// Handles the execution of the GetProductsQuery and retrieves the associated product data.
@@ -46,6 +48,37 @@ public class GetProductsQueryHandler(IDocumentSession documentSession) : IQueryH
             .Take(request.PageSize)
             .ToListAsync(cancellationToken);
 
+        await EnrichWithDiscountsAsync(products, cancellationToken).ConfigureAwait(false);
+        logger.LogInformation("Loaded {Count} products with discounts", products.Count);
+
         return new GetProductsQueryResult(products);
+    }
+
+    private async Task EnrichWithDiscountsAsync(List<Product> products, CancellationToken cancellationToken)
+    {
+        foreach (var product in products)
+        {
+            var response = await discountClient.GetProductDiscountsAsync(new GetProductDiscountsRequest
+            {
+                ProductId = product.Id.ToString(),
+                Categories = { product.Categories }
+            }, cancellationToken: cancellationToken).ConfigureAwait(false);
+
+            product.ActiveDiscounts = response.Discounts.Select(d => new ProductDiscount
+            {
+                Id = d.Id,
+                Code = d.Code,
+                Description = d.Description,
+                Percentage = (decimal)d.Percentage,
+                FixedAmount = (decimal)d.FixedAmount,
+                AllowStacking = d.AllowStacking,
+                MaxStackPercentage = (decimal)d.MaxStackPercentage,
+                MinimumAmount = (decimal)d.MinimumAmount,
+                Category = d.Category,
+                AutoApply = d.AutoApply,
+                StartDate = DateTimeOffset.TryParse(d.StartDate, out var start) ? start : DateTimeOffset.MinValue,
+                EndDate = DateTimeOffset.TryParse(d.EndDate, out var end) ? end : DateTimeOffset.MinValue
+            }).ToList();
+        }
     }
 }

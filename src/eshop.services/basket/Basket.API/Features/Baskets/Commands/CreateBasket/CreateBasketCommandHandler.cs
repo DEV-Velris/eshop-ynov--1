@@ -40,10 +40,52 @@ public class CreateBasketCommandHandler(IBasketRepository repository, DiscountPr
     {
         foreach (var item in cart.Items)
         {
-            var coupon = await discountProtoServiceClient.GetDiscountAsync(new GetDiscountRequest
-                { ProductName = item.ProductName }, cancellationToken: cancellationToken);
-            
-            item.Price -= (decimal)coupon.Amount;
+            if (item.OriginalPrice <= 0)
+            {
+                item.OriginalPrice = item.Price;
+            }
+        }
+
+        var cartModel = new ShoppingCartModel
+        {
+            UserName = cart.UserName,
+            CartTotal = (double)cart.Items.Sum(x => x.OriginalPrice * x.Quantity)
+        };
+
+        cartModel.Items.AddRange(cart.Items.Select(item => new CartItemModel
+        {
+            ProductId = item.ProductId.ToString(),
+            ProductName = item.ProductName,
+            UnitPrice = (double)item.OriginalPrice,
+            Quantity = item.Quantity,
+            Categories = { item.Categories }
+        }));
+
+        var response = await discountProtoServiceClient.ApplyDiscountsAsync(new ApplyDiscountRequest { Cart = cartModel }, cancellationToken: cancellationToken);
+
+        foreach (var itemResult in response.Items)
+        {
+            if (!Guid.TryParse(itemResult.ProductId, out var productId))
+            {
+                continue;
+            }
+
+            var cartItem = cart.Items.FirstOrDefault(x => x.ProductId == productId);
+            if (cartItem is null)
+            {
+                continue;
+            }
+
+            cartItem.Price = (decimal)itemResult.DiscountedUnitPrice;
+            cartItem.OriginalPrice = (decimal)itemResult.OriginalUnitPrice;
+            cartItem.AppliedDiscounts = itemResult.AppliedDiscounts.Select(d => new ShoppingCartItemDiscount
+            {
+                DiscountId = d.DiscountId,
+                Code = d.Code,
+                Description = d.Description,
+                PercentageApplied = (decimal)d.PercentageApplied,
+                AmountApplied = (decimal)d.AmountApplied
+            }).ToList();
         }
     }
 }

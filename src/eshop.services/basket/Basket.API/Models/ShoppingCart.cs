@@ -9,9 +9,13 @@ public class ShoppingCart
 {
     [Identity]
     public string UserName { get; set; } = string.Empty;
-    public IEnumerable<ShoppingCartItem> Items { get; set; } = [];
-    
+    public List<ShoppingCartItem> Items { get; set; } = [];
+
+    public decimal Subtotal => Items.Sum(item => item.OriginalPrice * item.Quantity);
+
     public decimal Total => Items.Sum(item => item.Price * item.Quantity);
+
+    public decimal DiscountTotal => Subtotal - Total;
 
     public ShoppingCart(string userName)
     {

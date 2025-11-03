@@ -1,132 +1,393 @@
+using System.Globalization;
 using Discount.Grpc.Data;
 using Discount.Grpc.Models;
+using Discount.Grpc.Models.Enums;
+using Discount.Grpc.Services.Models;
 using Grpc.Core;
-using Mapster;
 using Microsoft.EntityFrameworkCore;
 
 namespace Discount.Grpc.Services;
 
 /// <summary>
-/// The DiscountServiceServer class implements the gRPC service for managing discount data.
-/// It provides CRUD operations for discounts and communicates with the underlying database using a DbContext.
-/// This class inherits from DiscountProtoServiceBase, which defines the service methods in the gRPC contract,
-/// and implements the necessary logic for handling those methods.
+///     gRPC implementation exposing the discount management API.
 /// </summary>
-/// <remarks>
-/// This class uses the DiscountContext for database interactions and ILogger for logging purposes.
-/// It is registered with the gRPC pipeline in the application startup configuration.
-/// </remarks>
-public class DiscountServiceServer(DiscountContext dbContext, ILogger<DiscountServiceServer> logger) : DiscountProtoService.DiscountProtoServiceBase
+public class DiscountServiceServer : DiscountProtoService.DiscountProtoServiceBase
 {
-    /// <summary>
-    /// Retrieves discount details for a given product from the database.
-    /// </summary>
-    /// <param name="request">The request containing the product name to fetch the discount for.</param>
-    /// <param name="context">The gRPC server call context.</param>
-    /// <returns>
-    /// Returns a <see cref="CouponModel"/> containing the discount details for the specified product.
-    /// </returns>
-    /// <exception cref="RpcException">
-    /// Thrown if no discount is found for the specified product name.
-    /// </exception>
-    public override async Task<CouponModel> GetDiscount(GetDiscountRequest request, ServerCallContext context)
+    private readonly DiscountContext dbContext;
+    private readonly DiscountEvaluationService evaluationService;
+    private readonly ILogger<DiscountServiceServer> logger;
+
+    public DiscountServiceServer(
+        DiscountContext dbContext,
+        DiscountEvaluationService evaluationService,
+        ILogger<DiscountServiceServer> logger)
     {
-        logger.LogInformation("Retrieving discount for {ProductName}", request.ProductName);
-        
-        var coupon = await dbContext.Coupons.FirstOrDefaultAsync(x => x.ProductName == request.ProductName);
-        
-        if (coupon == null)
-            throw new RpcException(new Status(StatusCode.NotFound, $"Coupon with name {request.ProductName} not found"));
-        
-        logger.LogInformation("Discount retrieved for {ProductName}: {Amount}", coupon.ProductName, coupon.Amount);
-        
-        return coupon.Adapt<CouponModel>();
+        this.dbContext = dbContext;
+        this.evaluationService = evaluationService;
+        this.logger = logger;
     }
 
-    /// <summary>
-    /// Creates a new discount for a specified product and stores it in the database.
-    /// </summary>
-    /// <param name="request">The request containing the details of the new discount to create, including the coupon information.</param>
-    /// <param name="context">The gRPC server call context.</param>
-    /// <returns>
-    /// Returns a <see cref="CouponModel"/> representing the newly created discount.
-    /// </returns>
-    /// <exception cref="RpcException">
-    /// Thrown if the request's coupon information is null.
-    /// </exception>
+    public override async Task<CouponModel> GetDiscount(GetDiscountRequest request, ServerCallContext context)
+    {
+        logger.LogInformation("Fetching discount for product {ProductName} / {ProductId} or code {Code}", request.ProductName, request.ProductId, request.Code);
+
+        var coupon = await FindCouponAsync(request, context.CancellationToken).ConfigureAwait(false)
+                     ?? throw new RpcException(new Status(StatusCode.NotFound, "Discount not found"));
+
+        coupon.RefreshStatus(DateTimeOffset.UtcNow);
+        coupon.EnsureStackingThreshold();
+
+        return MapToModel(coupon);
+    }
+
     public override async Task<CouponModel> CreateDiscount(CreateDiscountRequest request, ServerCallContext context)
     {
         if (request.Coupon is null)
-            throw new RpcException(new Status(StatusCode.InvalidArgument, "Coupon is null"));
-        
-        var coupon = request.Coupon.Adapt<Coupon>();
-        logger.LogInformation("Creating new discount for {ProductName}", coupon.ProductName);
-        await dbContext.Coupons.AddAsync(coupon);
-        await dbContext.SaveChangesAsync();
-        logger.LogInformation("Discount created for {ProductName}: {Amount}", coupon.ProductName, coupon.Amount);
-        return coupon.Adapt<CouponModel>();
+        {
+            throw new RpcException(new Status(StatusCode.InvalidArgument, "Coupon is required"));
+        }
+
+        var coupon = new Coupon
+        {
+            Tiers = []
+        };
+
+        ApplyModelToEntity(request.Coupon, coupon);
+        coupon.RefreshStatus(DateTimeOffset.UtcNow);
+
+        await dbContext.Coupons.AddAsync(coupon, context.CancellationToken).ConfigureAwait(false);
+        await dbContext.SaveChangesAsync(context.CancellationToken).ConfigureAwait(false);
+
+        logger.LogInformation("Discount {Id} created", coupon.Id);
+
+        return MapToModel(coupon);
     }
 
-    /// <summary>
-    /// Updates the discount details for a specific product based on the provided request.
-    /// </summary>
-    /// <param name="request">An object containing the updated discount information for a specific product.</param>
-    /// <param name="context">The gRPC server call context.</param>
-    /// <returns>
-    /// Returns an updated <see cref="CouponModel"/> containing the modified discount details.
-    /// </returns>
-    /// <exception cref="RpcException">
-    /// Thrown if the provided coupon is null, or if the specified product or coupon identifier is not found in the database.
-    /// </exception>
     public override async Task<CouponModel> UpdateDiscount(UpdateDiscountRequest request, ServerCallContext context)
     {
         if (request.Coupon is null)
-            throw new RpcException(new Status(StatusCode.InvalidArgument, "Coupon is null"));
-        
-        logger.LogInformation("Updating discount for {ProductName}", request.Coupon.ProductName);
+        {
+            throw new RpcException(new Status(StatusCode.InvalidArgument, "Coupon is required"));
+        }
 
-        var coupon = await dbContext.Coupons.FirstOrDefaultAsync(x => x.ProductName == request.Coupon.ProductName 
-                                                                      || x.Id == request.Coupon.Id);
-        if(coupon is null)
-            throw new RpcException(new Status(StatusCode.NotFound, $"Coupon with name {request.Coupon.ProductName} " +
-                                                                   $" or Id {request.Coupon.Id} not found"));
-        request.Coupon.Adapt(coupon);
-        
-        dbContext.Coupons.Update(coupon);
-        await dbContext.SaveChangesAsync();
-        
-        logger.LogInformation("Discount updated for {ProductName}: {Amount}", coupon.ProductName, coupon.Amount);
-        return coupon.Adapt<CouponModel>();
+        var coupon = await dbContext.Coupons.Include(c => c.Tiers)
+            .FirstOrDefaultAsync(c => c.Id == request.Coupon.Id
+                                      || (!string.IsNullOrWhiteSpace(request.Coupon.ProductName) && c.ProductName == request.Coupon.ProductName)
+                                      || (!string.IsNullOrWhiteSpace(request.Coupon.Code) && c.Code == request.Coupon.Code),
+                context.CancellationToken)
+            .ConfigureAwait(false);
+
+        if (coupon is null)
+        {
+            throw new RpcException(new Status(StatusCode.NotFound, "Discount not found"));
+        }
+
+        ApplyModelToEntity(request.Coupon, coupon);
+        coupon.RefreshStatus(DateTimeOffset.UtcNow);
+
+        await dbContext.SaveChangesAsync(context.CancellationToken).ConfigureAwait(false);
+
+        logger.LogInformation("Discount {Id} updated", coupon.Id);
+
+        return MapToModel(coupon);
     }
 
-    /// <summary>
-    /// Deletes a discount for a specified product based on the provided coupon details.
-    /// </summary>
-    /// <param name="request">The request containing the details of the coupon to be deleted, including the product name or ID.</param>
-    /// <param name="context">The gRPC server call context.</param>
-    /// <returns>
-    /// Returns a <see cref="DeleteDiscountResponse"/> indicating whether the discount was successfully deleted.
-    /// </returns>
-    /// <exception cref="RpcException">
-    /// Thrown if the provided coupon is null, or if no matching discount is found for the specified product name or ID.
-    /// </exception>
-    public override async Task<DeleteDiscountResponse> DeleteDiscount(DeleteDiscountRequest request,
-        ServerCallContext context)
+    public override async Task<DeleteDiscountResponse> DeleteDiscount(DeleteDiscountRequest request, ServerCallContext context)
     {
         if (request.Coupon is null)
-            throw new RpcException(new Status(StatusCode.InvalidArgument, "Coupon is null"));
+        {
+            throw new RpcException(new Status(StatusCode.InvalidArgument, "Coupon is required"));
+        }
 
-        logger.LogInformation("Deleting discount for {ProductName}", request.Coupon.ProductName);
-        
-        var coupon = await dbContext.Coupons.FirstOrDefaultAsync(x => x.ProductName == request.Coupon.ProductName 
-                                                                      || x.Id == request.Coupon.Id);
-        if(coupon is null)
-            throw new RpcException(new Status(StatusCode.NotFound, $"Coupon with name {request.Coupon.ProductName} " +
-                                                                   $" or Id {request.Coupon.Id} not found"));
+        var coupon = await dbContext.Coupons.Include(c => c.Tiers)
+            .FirstOrDefaultAsync(c => c.Id == request.Coupon.Id
+                                      || (!string.IsNullOrWhiteSpace(request.Coupon.ProductName) && c.ProductName == request.Coupon.ProductName)
+                                      || (!string.IsNullOrWhiteSpace(request.Coupon.Code) && c.Code == request.Coupon.Code),
+                context.CancellationToken)
+            .ConfigureAwait(false);
+
+        if (coupon is null)
+        {
+            throw new RpcException(new Status(StatusCode.NotFound, "Discount not found"));
+        }
+
         dbContext.Coupons.Remove(coupon);
-        await dbContext.SaveChangesAsync();
-        logger.LogInformation("Discount deleted for {ProductName}", coupon.ProductName);
-        
-        return new DeleteDiscountResponse(){Success = true};
+        await dbContext.SaveChangesAsync(context.CancellationToken).ConfigureAwait(false);
+
+        logger.LogInformation("Discount {Id} deleted", coupon.Id);
+
+        return new DeleteDiscountResponse { Success = true };
     }
+
+    public override async Task<ApplyDiscountResponse> ApplyDiscounts(ApplyDiscountRequest request, ServerCallContext context)
+    {
+        if (request.Cart is null)
+        {
+            throw new RpcException(new Status(StatusCode.InvalidArgument, "Cart payload is required"));
+        }
+
+        var cartContext = MapToCartContext(request.Cart);
+        var result = await evaluationService.ApplyDiscountsAsync(cartContext, context.CancellationToken).ConfigureAwait(false);
+
+        return MapToApplyDiscountResponse(result);
+    }
+
+    public override async Task<ValidateDiscountResponse> ValidateDiscount(ValidateDiscountRequest request, ServerCallContext context)
+    {
+        if (string.IsNullOrWhiteSpace(request.Code))
+        {
+            throw new RpcException(new Status(StatusCode.InvalidArgument, "Code is required"));
+        }
+
+        var (isValid, coupon, reason) = await evaluationService.ValidateDiscountAsync(request.Code, (decimal)request.CartTotal, context.CancellationToken)
+            .ConfigureAwait(false);
+
+        var response = new ValidateDiscountResponse
+        {
+            IsValid = isValid,
+            Reason = reason ?? string.Empty
+        };
+
+        if (coupon is not null)
+        {
+            response.Coupon = MapToModel(coupon);
+        }
+
+        return response;
+    }
+
+    public override async Task<GetProductDiscountsResponse> GetProductDiscounts(GetProductDiscountsRequest request, ServerCallContext context)
+    {
+        var categories = request.Categories.ToList();
+        Guid? productId = Guid.TryParse(request.ProductId, out var parsed) ? parsed : null;
+
+        var discounts = await evaluationService.GetProductDiscountsAsync(productId, categories, context.CancellationToken)
+            .ConfigureAwait(false);
+
+        var response = new GetProductDiscountsResponse
+        {
+            ProductId = request.ProductId ?? string.Empty
+        };
+        response.Discounts.AddRange(discounts.Select(MapToModel));
+
+        return response;
+    }
+
+    public override async Task<ListDiscountsResponse> ListDiscounts(ListDiscountsRequest request, ServerCallContext context)
+    {
+        var status = MapToStatus(request.Status);
+        var (discounts, totalCount) = await evaluationService.ListDiscountsAsync(request.Page, request.PageSize, status, request.Search, context.CancellationToken)
+            .ConfigureAwait(false);
+
+        var response = new ListDiscountsResponse
+        {
+            TotalCount = totalCount
+        };
+        response.Discounts.AddRange(discounts.Select(MapToModel));
+
+        return response;
+    }
+
+    private async Task<Coupon?> FindCouponAsync(GetDiscountRequest request, CancellationToken cancellationToken)
+    {
+        var query = dbContext.Coupons.Include(c => c.Tiers).AsQueryable();
+
+        if (!string.IsNullOrWhiteSpace(request.Code))
+        {
+            return await query.FirstOrDefaultAsync(c => c.Code == request.Code, cancellationToken).ConfigureAwait(false);
+        }
+
+        if (!string.IsNullOrWhiteSpace(request.ProductId) && Guid.TryParse(request.ProductId, out var productId))
+        {
+            return await query.FirstOrDefaultAsync(c => c.ProductId == productId, cancellationToken).ConfigureAwait(false);
+        }
+
+        if (!string.IsNullOrWhiteSpace(request.ProductName))
+        {
+            return await query.FirstOrDefaultAsync(c => c.ProductName == request.ProductName, cancellationToken).ConfigureAwait(false);
+        }
+
+        return null;
+    }
+
+    private static CartContext MapToCartContext(ShoppingCartModel cart)
+    {
+        var items = cart.Items
+            .Select(item => new CartItemContext(
+                Guid.TryParse(item.ProductId, out var parsedId) ? parsedId : null,
+                item.ProductName ?? string.Empty,
+                item.Categories.ToList(),
+                Convert.ToDecimal(item.UnitPrice),
+                item.Quantity))
+            .ToList();
+
+        return new CartContext(
+            cart.UserName ?? string.Empty,
+            items,
+            string.IsNullOrWhiteSpace(cart.Code) ? null : cart.Code,
+            Convert.ToDecimal(cart.ExistingCouponPercentage),
+            Convert.ToDecimal(cart.CartTotal));
+    }
+
+    private ApplyDiscountResponse MapToApplyDiscountResponse(DiscountComputationResult result)
+    {
+        var response = new ApplyDiscountResponse
+        {
+            CartDiscount = (double)result.CartDiscount,
+            FinalTotal = (double)result.FinalTotal
+        };
+
+        response.Items.AddRange(result.Items.Select(item =>
+        {
+            var itemModel = new ItemDiscountModel
+            {
+                ProductId = item.ProductId?.ToString() ?? string.Empty,
+                OriginalUnitPrice = (double)item.OriginalUnitPrice,
+                DiscountedUnitPrice = (double)item.DiscountedUnitPrice,
+                TotalDiscount = (double)item.TotalDiscount,
+                Quantity = item.Quantity
+            };
+            itemModel.AppliedDiscounts.AddRange(item.AppliedDiscounts.Select(d => new AppliedDiscountModel
+            {
+                DiscountId = d.DiscountId,
+                Code = d.Code ?? string.Empty,
+                Description = d.Description ?? string.Empty,
+                PercentageApplied = (double)d.PercentageApplied,
+                AmountApplied = (double)d.AmountApplied
+            }));
+            return itemModel;
+        }));
+
+        return response;
+    }
+
+    private CouponModel MapToModel(Coupon coupon)
+    {
+        var model = new CouponModel
+        {
+            Id = coupon.Id,
+            ProductId = coupon.ProductId?.ToString() ?? string.Empty,
+            ProductName = coupon.ProductName ?? string.Empty,
+            Description = coupon.Description ?? string.Empty,
+            Percentage = (double)coupon.Percentage,
+            FixedAmount = (double)coupon.FixedAmount,
+            Code = coupon.Code ?? string.Empty,
+            Type = MapToModel(coupon.Type),
+            Status = MapToModel(coupon.Status),
+            StartDate = coupon.StartDate.ToString("O"),
+            EndDate = coupon.EndDate.ToString("O"),
+            AllowStacking = coupon.AllowStacking,
+            MaxStackPercentage = (double)coupon.MaxStackPercentage,
+            MinimumAmount = (double)coupon.MinimumAmount,
+            Category = coupon.Category ?? string.Empty,
+            AutoApply = coupon.AutoApply,
+            IsDisabled = coupon.IsDisabled
+        };
+
+        model.Tiers.AddRange(coupon.Tiers
+            .OrderBy(t => t.ThresholdAmount)
+            .Select(t => new DiscountTierModel
+            {
+                Id = t.Id,
+                ThresholdAmount = (double)t.ThresholdAmount,
+                Percentage = (double)t.Percentage,
+                FixedAmount = (double)t.FixedAmount
+            }));
+
+        return model;
+    }
+
+    private void ApplyModelToEntity(CouponModel model, Coupon coupon)
+    {
+        coupon.ProductName = model.ProductName ?? string.Empty;
+        coupon.Description = model.Description ?? string.Empty;
+        coupon.Percentage = Convert.ToDecimal(model.Percentage);
+        coupon.FixedAmount = Convert.ToDecimal(model.FixedAmount);
+        coupon.Code = model.Code ?? string.Empty;
+        coupon.Type = MapToEntity(model.Type);
+        coupon.Status = MapToStatus(model.Status);
+        coupon.StartDate = ParseDate(model.StartDate, coupon.StartDate);
+        coupon.EndDate = ParseDate(model.EndDate, coupon.EndDate);
+        coupon.AllowStacking = model.AllowStacking;
+        coupon.MaxStackPercentage = Convert.ToDecimal(model.MaxStackPercentage);
+        coupon.MinimumAmount = Convert.ToDecimal(model.MinimumAmount);
+        coupon.Category = model.Category ?? string.Empty;
+        coupon.AutoApply = model.AutoApply;
+        coupon.IsDisabled = model.IsDisabled;
+
+        if (Guid.TryParse(model.ProductId, out var productId))
+        {
+            coupon.ProductId = productId;
+        }
+        else
+        {
+            coupon.ProductId = null;
+        }
+
+        UpdateTiers(model, coupon);
+    }
+
+    private void UpdateTiers(CouponModel model, Coupon coupon)
+    {
+        if (coupon.Tiers is null)
+        {
+            coupon.Tiers = new List<DiscountTier>();
+        }
+
+        if (coupon.Tiers.Count > 0)
+        {
+            dbContext.DiscountTiers.RemoveRange(coupon.Tiers);
+            coupon.Tiers.Clear();
+        }
+
+        foreach (var tierModel in model.Tiers)
+        {
+            coupon.Tiers.Add(new DiscountTier
+            {
+                ThresholdAmount = Convert.ToDecimal(tierModel.ThresholdAmount),
+                Percentage = Convert.ToDecimal(tierModel.Percentage),
+                FixedAmount = Convert.ToDecimal(tierModel.FixedAmount)
+            });
+        }
+    }
+
+    private static DateTimeOffset ParseDate(string value, DateTimeOffset fallback)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return fallback;
+        }
+
+        return DateTimeOffset.TryParse(value, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out var parsed)
+            ? parsed
+            : fallback;
+    }
+
+    private static DiscountType MapToEntity(DiscountTypeModel model) => model switch
+    {
+        DiscountTypeModel.DiscountTypeModelPercentagePlusFixed => DiscountType.PercentagePlusFixedAmount,
+        _ => DiscountType.Percentage
+    };
+
+    private static DiscountTypeModel MapToModel(DiscountType type) => type switch
+    {
+        DiscountType.PercentagePlusFixedAmount => DiscountTypeModel.DiscountTypeModelPercentagePlusFixed,
+        _ => DiscountTypeModel.DiscountTypeModelPercentage
+    };
+
+    private static DiscountStatus MapToStatus(DiscountStatusModel model) => model switch
+    {
+        DiscountStatusModel.DiscountStatusModelExpired => DiscountStatus.Expired,
+        DiscountStatusModel.DiscountStatusModelDisabled => DiscountStatus.Disabled,
+        DiscountStatusModel.DiscountStatusModelUpcoming => DiscountStatus.Upcoming,
+        _ => DiscountStatus.Active
+    };
+
+    private static DiscountStatusModel MapToModel(DiscountStatus status) => status switch
+    {
+        DiscountStatus.Expired => DiscountStatusModel.DiscountStatusModelExpired,
+        DiscountStatus.Disabled => DiscountStatusModel.DiscountStatusModelDisabled,
+        DiscountStatus.Upcoming => DiscountStatusModel.DiscountStatusModelUpcoming,
+        _ => DiscountStatusModel.DiscountStatusModelActive
+    };
 }
