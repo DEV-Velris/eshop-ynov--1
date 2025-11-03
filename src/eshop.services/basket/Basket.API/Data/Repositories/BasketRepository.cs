@@ -1,5 +1,6 @@
 using Basket.API.Exceptions;
 using Basket.API.Models;
+using Discount.Grpc;
 using Marten;
 using ShoppingItem.API.Exceptions;
 
