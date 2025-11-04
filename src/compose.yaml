@@ -7,6 +7,13 @@
     hostname: ecommerce-rabbitmq-server
     networks:
       - messageBroker_network
+
+  mailpit:
+    image: axllent/mailpit
+    container_name: mailpit
+    restart: unless-stopped
+    networks:
+      - mail_network
   
   ### Service Catalog ###
   
@@ -113,6 +120,7 @@
     networks:
       - ordering_network
       - messageBroker_network
+      - mail_network
     depends_on:
       ordering.database:
         condition: service_started
@@ -122,6 +130,32 @@
         condition: service_healthy
         required: true
         restart: true
+
+  ### Service Email ###
+  
+  email.api:
+    image: email.api
+    container_name: email_api
+    build:
+      context: .
+      dockerfile: eshop.services/email/Email.API/Dockerfile
+    networks:
+      - messageBroker_network
+      - mail_network
+    depends_on:
+      messageBroker:
+        condition: service_healthy
+        required: true
+        restart: true
+      mailpit:
+        condition: service_started
+        required: true
+        restart: true
+    environment:
+      - ConnectionStrings__MessageBroker=amqp://guest:guest@messageBroker:5672
+      - EmailSettings__SmtpHost=mailpit
+      - EmailSettings__SmtpPort=1025
+      - EmailSettings__EnableSsl=false
 
 ### Shared infrastructure ###
 volumes:
@@ -150,3 +184,5 @@ networks:
     name: ordering_network
   messageBroker_network:
     name: messageBroker_network
+  mail_network:
+    name: mail_network
