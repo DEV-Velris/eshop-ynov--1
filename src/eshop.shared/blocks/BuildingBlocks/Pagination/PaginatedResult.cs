@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+
 namespace BuildingBlocks.Pagination;
 
 /// <summary>
@@ -8,11 +10,23 @@ namespace BuildingBlocks.Pagination;
 /// <typeparam name="TEntity">
 /// The type of the entities within the paginated result. Must be a reference type.
 /// </typeparam>
-public class PaginatedResult<TEntity>(int pageIndex, int pageSize, long totalCount, IEnumerable<TEntity> data)
-    where TEntity : class
+public class PaginatedResult<TEntity> where TEntity : class
 {
-    public int PageIndex { get; } = pageIndex;
-    public int PageSize { get; } = pageSize;
-    public long TotalCount { get; } = totalCount;
-    public IEnumerable<TEntity> Data { get; } = data;
+    public int PageIndex { get; set; }
+    public int PageSize { get; set; }
+    public long TotalCount { get; set; }
+    public IEnumerable<TEntity> Data { get; set; } = [];
+
+    public PaginatedResult()
+    {
+    }
+
+    [JsonConstructor]
+    public PaginatedResult(int pageIndex, int pageSize, long totalCount, IEnumerable<TEntity> data)
+    {
+        PageIndex = pageIndex;
+        PageSize = pageSize;
+        TotalCount = totalCount;
+        Data = data;
+    }
 }

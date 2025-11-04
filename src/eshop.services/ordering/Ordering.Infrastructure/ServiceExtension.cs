@@ -5,6 +5,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Ordering.Application.Features.Orders.Data;
 using Ordering.Infrastructure.Data;
 using Ordering.Infrastructure.Data.Interceptors;
+using Ordering.Infrastructure.Data.Repositories;
 
 namespace Ordering.Infrastructure;
 
@@ -22,6 +23,9 @@ public static class ServiceExtension
             options.AddInterceptors(serviceProvider.GetServices<ISaveChangesInterceptor>());
             options.UseSqlServer(connectionString);
         });
+
+        // Register repositories
+        services.AddScoped<IOrderRepository, OrderRepository>();
         
         return services;
     }

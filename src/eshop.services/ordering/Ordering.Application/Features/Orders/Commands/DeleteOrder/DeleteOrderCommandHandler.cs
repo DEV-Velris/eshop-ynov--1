@@ -1,9 +1,15 @@
 using BuildingBlocks.CQRS;
+using Microsoft.Extensions.Logging;
 using Ordering.Application.Features.Orders.Data;
+using Ordering.Domain.Exceptions;
 
 namespace Ordering.Application.Features.Orders.Commands.DeleteOrder;
 
-public class DeleteOrderCommandHandler(IOrderingDbContext orderingDbContext) : ICommandHandler<DeleteOrderCommand, DeleteOrderCommandResult>
+/// <summary>
+/// Handles the deletion of orders from the system.
+/// </summary>
+public class DeleteOrderCommandHandler(IOrderRepository orderRepository, ILogger<DeleteOrderCommandHandler> logger) 
+    : ICommandHandler<DeleteOrderCommand, DeleteOrderCommandResult>
 {
     /// <summary>
     /// Handles the operation for deleting an order based on the provided command.
@@ -16,7 +22,17 @@ public class DeleteOrderCommandHandler(IOrderingDbContext orderingDbContext) : I
     /// </exception>
     public async Task<DeleteOrderCommandResult> Handle(DeleteOrderCommand request, CancellationToken cancellationToken)
     {
-      // TODO
+        logger.LogInformation("Deleting order {OrderId}", request.OrderId);
+
+        var success = await orderRepository.DeleteAsync(request.OrderId, cancellationToken);
+        if (!success)
+        {
+            var message = $"Order with ID {request.OrderId} not found or could not be deleted";
+            logger.LogWarning(message);
+            throw new OrderNotFoundException(request.OrderId);
+        }
+        
+        logger.LogInformation("Order {OrderId} deleted successfully", request.OrderId);
         
         return new DeleteOrderCommandResult(true);
     }

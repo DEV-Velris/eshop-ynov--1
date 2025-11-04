@@ -1,9 +1,16 @@
+using BuildingBlocks.Pagination;
 using MediatR;
 using Microsoft.AspNetCore.Mvc;
 using Ordering.Application.Features.Orders.Commands.CreateOrder;
 using Ordering.Application.Features.Orders.Commands.DeleteOrder;
 using Ordering.Application.Features.Orders.Commands.UpdateOrder;
+using Ordering.Application.Features.Orders.Commands.UpdateOrderStatus;
 using Ordering.Application.Features.Orders.Dtos;
+using Ordering.Application.Features.Orders.Queries.GetOrderById;
+using Ordering.Application.Features.Orders.Queries.GetOrders;
+using Ordering.Application.Features.Orders.Queries.GetOrdersByCustomerId;
+using Ordering.Application.Features.Orders.Queries.GetOrdersByName;
+using Ordering.Domain.Enums;
 
 namespace Ordering.API.Controllers;
 
@@ -17,17 +24,31 @@ namespace Ordering.API.Controllers;
 public class OrdersController(ISender sender) : ControllerBase
 {
     /// <summary>
+    /// Retrieves an order by its unique identifier.
+    /// </summary>
+    /// <param name="id">The unique identifier of the order to retrieve.</param>
+    /// <returns>The order matching the specified identifier, if found; otherwise, a not found response.</returns>
+    [HttpGet("{id:guid}")]
+    [ProducesResponseType(typeof(OrderDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(NotFoundObjectResult), StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<OrderDto>> GetOrderById(Guid id)
+    {
+        var result = await sender.Send(new GetOrderByIdQuery(id));
+        return Ok(result.Order);
+    }
+
+    /// <summary>
     /// Retrieves a list of orders filtered by the provided order name.
     /// </summary>
     /// <param name="name">The name used to filter the orders.</param>
     /// <returns>A collection of <see cref="OrderDto"/> objects that match the specified name.</returns>
-    [HttpGet("{name}")]
+    [HttpGet("name/{name}")]
     [ProducesResponseType(typeof(IEnumerable<OrderDto>), StatusCodes.Status200OK)]
-    [ProducesResponseType(typeof(NotFoundObjectResult), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(BadRequestObjectResult), StatusCodes.Status400BadRequest)]
     public async Task<ActionResult<IEnumerable<OrderDto>>> GetOrdersByName(string name)
     {
-        // TODO
-        return Ok();
+        var result = await sender.Send(new GetOrdersByNameQuery(name));
+        return Ok(result.Orders);
     }
 
     /// <summary>
@@ -40,8 +61,8 @@ public class OrdersController(ISender sender) : ControllerBase
     [ProducesResponseType(typeof(NotFoundObjectResult), StatusCodes.Status404NotFound)]
     public async Task<ActionResult<IEnumerable<OrderDto>>> GetOrdersByCustomerId(Guid customerId)
     {
-        // TODO
-        return Ok();
+        GetOrdersByCustomerIdQueryResult result = await sender.Send(new GetOrdersByCustomerIdQuery(customerId));
+        return Ok(result.Orders);
     }
 
 
@@ -50,14 +71,15 @@ public class OrdersController(ISender sender) : ControllerBase
     /// </summary>
     /// <param name="pageIndex">The zero-based index of the page to retrieve.</param>
     /// <param name="pageSize">The number of orders to include in each page of results.</param>
-    /// <returns>A collection of <see cref="OrderDto"/> objects representing the paginated list of orders.</returns>
+    /// <returns>A paginated collection of <see cref="OrderDto"/> objects representing the list of orders.</returns>
     [HttpGet]
-    [ProducesResponseType(typeof(IEnumerable<OrderDto>), StatusCodes.Status200OK)]
-    [ProducesResponseType(typeof(NotFoundObjectResult), StatusCodes.Status404NotFound)]
-    public async Task<ActionResult<IEnumerable<OrderDto>>> GetOrders([FromQuery] int pageIndex ,[FromQuery]  int pageSize)
+    [ProducesResponseType(typeof(PaginatedResult<OrderDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(BadRequestObjectResult), StatusCodes.Status400BadRequest)]
+    public async Task<ActionResult<PaginatedResult<OrderDto>>> GetOrders([FromQuery] int pageIndex = 0, [FromQuery] int pageSize = 10)
     {
-        // TODO
-        return Ok();
+        var paginationRequest = new PaginationRequest(pageIndex, pageSize);
+        var result = await sender.Send(new GetOrdersQuery(paginationRequest));
+        return Ok(result.Orders);
     }
 
     /// <summary>
@@ -84,6 +106,21 @@ public class OrdersController(ISender sender) : ControllerBase
     public async Task<ActionResult<bool>> UpdateOrder([FromBody] OrderDto order)
     {
         var result = await sender.Send(new UpdateOrderCommand(order));
+        return Ok(result.IsSuccess);
+    }
+
+    /// <summary>
+    /// Updates the status of an existing order.
+    /// </summary>
+    /// <param name="orderId">The unique identifier of the order to update.</param>
+    /// <param name="orderStatus">The new status to set for the order.</param>
+    /// <returns>A boolean result indicating whether the status update was successful.</returns>
+    [HttpPatch("{orderId:guid}/status")]
+    [ProducesResponseType(typeof(bool), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(NotFoundObjectResult), StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<bool>> UpdateOrderStatus(Guid orderId, [FromBody] OrderStatus orderStatus)
+    {
+        var result = await sender.Send(new UpdateOrderStatusCommand(orderId, orderStatus));
         return Ok(result.IsSuccess);
     }
 

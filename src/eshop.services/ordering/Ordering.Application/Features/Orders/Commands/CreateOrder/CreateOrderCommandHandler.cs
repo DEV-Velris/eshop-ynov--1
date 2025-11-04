@@ -1,9 +1,18 @@
 using BuildingBlocks.CQRS;
+using BuildingBlocks.Messaging.Events;
+using MassTransit;
+using Microsoft.Extensions.Logging;
 using Ordering.Application.Features.Orders.Data;
 
 namespace Ordering.Application.Features.Orders.Commands.CreateOrder;
 
-public class CreateOrderCommandHandler (IOrderingDbContext orderingDbContext) : ICommandHandler<CreateOrderCommand, CreateOrderCommandResult>
+/// <summary>
+/// Handles the creation of new orders and publishes OrderCreatedEvent for downstream processing.
+/// </summary>
+public class CreateOrderCommandHandler(
+    IOrderingDbContext orderingDbContext, 
+    IPublishEndpoint publishEndpoint,
+    ILogger<CreateOrderCommandHandler> logger) : ICommandHandler<CreateOrderCommand, CreateOrderCommandResult>
 {
     /// <summary>
     /// Handles the execution logic for creating an order command.
@@ -13,10 +22,38 @@ public class CreateOrderCommandHandler (IOrderingDbContext orderingDbContext) : 
     /// <returns>A task that represents the result of the handling operation, containing the newly created order's ID.</returns>
     public async Task<CreateOrderCommandResult> Handle(CreateOrderCommand request, CancellationToken cancellationToken)
     {
+        logger.LogInformation("Creating order for customer {CustomerId}", request.Order.CustomerId);
+        
         var order = CreateOrderCommandMapper.CreateNewOrderFromDto(request.Order);
-        // TODO
+        
+        // Save order to database
+        orderingDbContext.Orders.Add(order);
+        await orderingDbContext.SaveChangesAsync(cancellationToken);
+        
+        logger.LogInformation("Order {OrderId} created successfully", order.Id.Value);
+        
+        // Publish OrderCreatedEvent for downstream processing
+        var orderCreatedEvent = new OrderCreatedEvent
+        {
+            OrderId = order.Id.Value,
+            CustomerId = order.CustomerId.Value,
+            OrderName = order.OrderName.Value,
+            TotalPrice = order.TotalPrice,
+            OrderDate = order.CreatedAt ?? DateTime.UtcNow,
+            CustomerName = $"{request.Order.ShippingAddress.FirstName} {request.Order.ShippingAddress.LastName}",
+            CustomerEmail = request.Order.ShippingAddress.EmailAddress,
+            OrderItems = [.. order.OrderItems.Select(oi => new OrderItemEvent
+            {
+                ProductId = oi.ProductId.Value,
+                Quantity = oi.Quantity,
+                Price = oi.Price
+            })]
+        };
+
+        await publishEndpoint.Publish(orderCreatedEvent, cancellationToken);
+        
+        logger.LogInformation("OrderCreatedEvent published for order {OrderId}", order.Id.Value);
+        
         return new CreateOrderCommandResult(order.Id.Value);
     }
-
-
 }
