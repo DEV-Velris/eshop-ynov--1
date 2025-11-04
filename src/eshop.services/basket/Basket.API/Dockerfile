@@ -3,7 +3,7 @@ USER $APP_UID
 WORKDIR /app
 EXPOSE 6061
 
-FROM mcr.microsoft.com/dotnet/sdk:9.0 AS build
+FROM --platform=linux/amd64 mcr.microsoft.com/dotnet/sdk:9.0 AS build
 ARG BUILD_CONFIGURATION=Release
 WORKDIR /src
 COPY ["eshop.services/basket/Basket.API/Basket.API.csproj", "eshop.services/basket/Basket.API/"]

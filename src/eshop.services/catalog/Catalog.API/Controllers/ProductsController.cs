@@ -87,7 +87,15 @@ public class ProductsController(ISender sender) : ControllerBase
         pageNumber = pageNumber < 1 ? 1 : pageNumber;
         pageSize = pageSize < 1 ? 10 : pageSize;
 
-        var result = await sender.Send(new GetProductsQuery(pageNumber, pageSize, category, name, minPrice, maxPrice));
+        var query = new GetProductsQuery(
+            PageNumber: pageNumber, 
+            PageSize: pageSize, 
+            Category: category, 
+            Name: name, 
+            MinPrice: minPrice, 
+            MaxPrice: maxPrice);
+        
+        var result = await sender.Send(query);
 
         return Ok(result.Products);
     }
