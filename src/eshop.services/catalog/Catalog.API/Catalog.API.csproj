@@ -21,6 +21,7 @@
         <PackageReference Include="ClosedXML" Version="0.105.0" />
         <PackageReference Include="ExcelDataReader" Version="3.8.0" />
         <PackageReference Include="ExcelDataReader.DataSet" Version="3.8.0" />
+        <PackageReference Include="Grpc.AspNetCore" Version="2.71.0" />
         <PackageReference Include="Mapster" Version="7.4.0" />
         <PackageReference Include="Marten" Version="8.3.1" />
         <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="9.0.5"/>
@@ -35,6 +36,17 @@
 
     <ItemGroup>
       <ProjectReference Include="..\..\..\eshop.shared\blocks\BuildingBlocks\BuildingBlocks.csproj" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <Protobuf Include="Protos\discount.proto">
+            <GrpcServices>Client</GrpcServices>
+            <Access>Public</Access>
+            <ProtoCompile>True</ProtoCompile>
+            <CompileOutputs>True</CompileOutputs>
+            <OutputDir>obj/Debug/net9.0/</OutputDir>
+            <Generator>MSBuild:Compile</Generator>
+        </Protobuf>
     </ItemGroup>
 
 </Project>
