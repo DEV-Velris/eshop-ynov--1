@@ -42,7 +42,7 @@ public class CreateBasketCommandHandler(
     private async Task ApplyDiscountToItemAsync(ShoppingCart cart, CancellationToken cancellationToken)
     {
         var now = DateTime.UtcNow;
-    
+
         foreach (var item in cart.Items)
         {
             var coupon = await discountProtoServiceClient.GetDiscountAsync(new GetDiscountRequest
@@ -54,15 +54,15 @@ public class CreateBasketCommandHandler(
             // Vérifier la validité temporelle du coupon
             var startDate = coupon.StartsAt?.ToDateTime();
             var endDate = coupon.ExpiresAt?.ToDateTime();
-        
+
             if (startDate.HasValue && now < startDate.Value)
                 continue;
-            
+
             if (endDate.HasValue && now > endDate.Value)
                 continue;
 
             // Vérifier si la catégorie du produit correspond (si applicable)
-            if (!string.IsNullOrEmpty(coupon.Category) && 
+            if (!string.IsNullOrEmpty(coupon.Category) &&
                 !string.Equals(item.Category, coupon.Category, StringComparison.OrdinalIgnoreCase))
                 continue;
 
@@ -79,5 +79,4 @@ public class CreateBasketCommandHandler(
             }
         }
     }
-
 }
