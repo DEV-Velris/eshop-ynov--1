@@ -139,6 +139,52 @@
       - redisinsight_data:/data
     networks:
       - basket_network
+
+#### DISCOUNT ####
+  discount.grpc:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        PROJECT_PATH: eshop.services/discount/Discount.Grpc
+        PROJECT_NAME: Discount.Grpc
+        SERVICE_API_PORT: ${DISCOUNT_GRPC_PORT}
+    image: discount.grpc:dev
+    container_name: discount_grpc
+    platform: linux/arm64/v8
+    ports:
+      - "6062:${DISCOUNT_GRPC_PORT}" #grpc
+    environment:
+      - ASPNETCORE_HTTP_PORTS=${DISCOUNT_GRPC_PORT}
+      - ConnectionStrings__DiscountConnection=Data Source = discountDatabase
+    volumes:
+      - ./:/src:delegated
+      - ~/.nuget/packages:/root/.nuget/packages:ro
+    networks:
+      - discount_network
+      - basket_network
+
+  discount.api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        PROJECT_PATH: eshop.services/discount/Discount.API
+        PROJECT_NAME: Discount.API
+        SERVICE_API_PORT: ${DISCOUNT_API_PORT}
+    image: discount.api:dev
+    container_name: discount_api
+    platform: linux/arm64/v8
+    ports:
+      - "6064:${DISCOUNT_API_PORT}" #http
+    environment:
+      - ASPNETCORE_HTTP_PORTS=${DISCOUNT_API_PORT}
+      - ConnectionStrings__DiscountConnection=Data Source = discountDatabase
+    volumes:
+      - ./:/src:delegated
+      - ~/.nuget/packages:/root/.nuget/packages:ro
+    networks:
+      - discount_network
    
    
 #### INFRA ####

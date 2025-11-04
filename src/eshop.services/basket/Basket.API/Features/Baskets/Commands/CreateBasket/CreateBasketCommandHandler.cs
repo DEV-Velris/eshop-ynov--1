@@ -51,7 +51,6 @@ public class CreateBasketCommandHandler(
             if (coupon is null or { AmountInMinor: 0, PercentageBps: 0 })
                 continue;
 
-            // Vérifier la validité temporelle du coupon
             var startDate = coupon.StartsAt?.ToDateTime();
             var endDate = coupon.ExpiresAt?.ToDateTime();
 
@@ -61,12 +60,10 @@ public class CreateBasketCommandHandler(
             if (endDate.HasValue && now > endDate.Value)
                 continue;
 
-            // Vérifier si la catégorie du produit correspond (si applicable)
             if (!string.IsNullOrEmpty(coupon.Category) &&
                 !string.Equals(item.Category, coupon.Category, StringComparison.OrdinalIgnoreCase))
                 continue;
 
-            // Appliquer la réduction
             if (coupon.DiscountType is CouponModel.Types.CouponDiscountType.Amount)
             {
                 var discountAmount = coupon.AmountInMinor / 100m;

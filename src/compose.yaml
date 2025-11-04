@@ -43,6 +43,16 @@
     networks:
       - discount_network
       - basket_network
+
+  discount.api:
+    image: discount.api
+    container_name: discount_api
+    restart: always
+    build:
+      context: .
+      dockerfile: eshop.services/discount/Discount.API/Dockerfile
+    networks:
+      - discount_network
   
   ### Service Basket ###
   

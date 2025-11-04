@@ -1,4 +1,4 @@
-namespace Discount.Grpc.Models;
+namespace Discount.API.Models;
 
 public enum CouponDiscountType
 {

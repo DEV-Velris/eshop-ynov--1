@@ -33,12 +33,39 @@ public class DiscountServiceServer(DiscountContext dbContext, ILogger<DiscountSe
     {
         logger.LogInformation("Retrieving discount for {ProductName}", request.ProductName);
         
-        var coupon = await dbContext.Coupons.FirstOrDefaultAsync(x => x.ProductName == request.ProductName);
+        Coupon? coupon = null;
+        
+        try
+        {
+            coupon = await dbContext.Coupons.FirstOrDefaultAsync(x => x.ProductName == request.ProductName);
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning("Failed to query coupons table: {Error}. Returning default no-discount coupon.", ex.Message);
+        }
         
         if (coupon == null)
-            throw new RpcException(new Status(StatusCode.NotFound, $"Coupon with name {request.ProductName} not found"));
+        {
+            // Return a default "no discount" coupon instead of throwing an exception
+            logger.LogInformation("No discount found for {ProductName}, returning default no-discount coupon", request.ProductName);
+            return new CouponModel
+            {
+                Id = 0,
+                ProductName = request.ProductName,
+                Description = "No discount available",
+                Code = "",
+                DiscountType = CouponModel.Types.CouponDiscountType.Amount,
+                AmountInMinor = 0,
+                IsActive = false
+            };
+        }
         
         logger.LogInformation("Discount retrieved for {ProductName}: {Amount}", coupon.ProductName, coupon.Amount);
+        
+        // Ensure required fields are not null for protobuf conversion
+        coupon.Code ??= string.Empty;
+        coupon.Description ??= string.Empty;
+        coupon.Category ??= string.Empty;
         
         return coupon.Adapt<CouponModel>();
     }
