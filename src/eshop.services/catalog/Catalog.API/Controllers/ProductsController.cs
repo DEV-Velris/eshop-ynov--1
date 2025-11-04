@@ -1,6 +1,12 @@
+using System.IO.Compression;
 using Catalog.API.Features.Products.Commands.CreateProduct;
+using Catalog.API.Features.Products.Commands.DeleteProduct;
+using Catalog.API.Features.Products.Commands.ImportProducts;
 using Catalog.API.Features.Products.Commands.UpdateProduct;
+using Catalog.API.Features.Products.Queries.ExportProducts;
 using Catalog.API.Features.Products.Queries.GetProductById;
+using Catalog.API.Features.Products.Queries.GetProducts;
+using Catalog.API.Features.Products.Queries.GetProductsByCategory;
 using Catalog.API.Models;
 using MediatR;
 using Microsoft.AspNetCore.Mvc;
@@ -28,7 +34,6 @@ public class ProductsController(ISender sender) : ControllerBase
     {
         var result = await sender.Send(new GetProductByIdQuery(id));
         return Ok(result.Product);
-
     }
 
     /// <summary>
@@ -41,12 +46,11 @@ public class ProductsController(ISender sender) : ControllerBase
     [ProducesResponseType(typeof(BadRequestObjectResult), StatusCodes.Status400BadRequest)]
     public async Task<ActionResult<Product>> GetProductsByCategory(string category)
     {
-        // TODO
         if (string.IsNullOrWhiteSpace(category))
             return BadRequest("Category is required");
-        
-        var result = await sender.Send(new ());
-        return Ok();
+
+        var result = await sender.Send(new GetProductsByCategoryQuery(category));
+        return Ok(result.Products);
     }
 
     /// <summary>
@@ -56,12 +60,36 @@ public class ProductsController(ISender sender) : ControllerBase
     [HttpGet]
     [ProducesResponseType(typeof(IEnumerable<Product>), StatusCodes.Status200OK)]
     public async Task<ActionResult<IEnumerable<Product>>> GetProducts(
-        [FromQuery] int pageNumber
-       , [FromQuery] int pageSize)
+        [FromQuery] int pageNumber,
+        [FromQuery] int pageSize,
+        [FromQuery] string? category = null,
+        [FromQuery] string? name = null,
+        [FromQuery] decimal? minPrice = null,
+        [FromQuery] decimal? maxPrice = null
+    )
+
     {
-        // TODO
-        var result = await sender.Send(new ()); 
-        return Ok();
+        var providedParameters = Request.Query.Keys;
+
+        // Create list of invalid parameters if not in the accepted list
+        var invalidParameters = providedParameters.Except(
+            [
+                "pageNumber", "pageSize", "category", "name", "minPrice", "maxPrice"
+            ],
+            StringComparer.OrdinalIgnoreCase).ToList();
+
+        if (invalidParameters.Count > 0)
+        {
+            return BadRequest($"Invalid query parameters: {string.Join(", ", invalidParameters)}");
+        }
+
+        // By default, return the first page with 10 items if parameters are not provided or invalid
+        pageNumber = pageNumber < 1 ? 1 : pageNumber;
+        pageSize = pageSize < 1 ? 10 : pageSize;
+
+        var result = await sender.Send(new GetProductsQuery(pageNumber, pageSize, category, name, minPrice, maxPrice));
+
+        return Ok(result.Products);
     }
 
     /// <summary>
@@ -88,7 +116,6 @@ public class ProductsController(ISender sender) : ControllerBase
     [ProducesResponseType(typeof(NotFoundObjectResult), StatusCodes.Status404NotFound)]
     public async Task<ActionResult<bool>> UpdateProduct(Guid id, [FromBody] UpdateProductCommand request)
     {
-        // TODO
         var result = await sender.Send(request);
         return Ok(result.IsSuccessful);
     }
@@ -103,10 +130,91 @@ public class ProductsController(ISender sender) : ControllerBase
     [ProducesResponseType(typeof(NotFoundObjectResult), StatusCodes.Status404NotFound)]
     public async Task<ActionResult<Product>> DeleteProduct(Guid id)
     {
-        // TODO
-        var result = await sender.Send(new ());
-        return Ok();
+        var result = await sender.Send(new DeleteProductCommand(id));
+        return Ok(result.IsSuccessful);
     }
-    
-    // TODO : faire une ressource pour importer à partir d'un fichier excel les produits
+
+    /// <summary>
+    /// Imports products from an uploaded .xlsx file.
+    /// </summary>
+    /// <param name="file">The file send by the requester</param>
+    /// <param name="ct">The cancellation token</param>
+    /// <returns></returns>
+    [HttpPost("import")]
+    [Consumes("multipart/form-data")]
+    [ProducesResponseType(typeof(ImportProductsCommandResult), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(BadRequestObjectResult), StatusCodes.Status400BadRequest)]
+    public async Task<ActionResult<bool>> ImportProducts([FromForm] IFormFile file, CancellationToken ct)
+    {
+        // Validate the uploaded file
+        if (file is null || file.Length == 0)
+        {
+            return BadRequest("Fichier .xlsx manquant ou vide.");
+        }
+
+        // Check file extension
+        var extension = Path.GetExtension(file.FileName);
+        if (!string.Equals(extension, ".xlsx", StringComparison.OrdinalIgnoreCase))
+        {
+            return BadRequest("Format de fichier non supporté. Veuillez télécharger un fichier .xlsx.");
+        }
+
+        // Check MIME type
+        var allowedTypes = new[]
+        {
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            "application/octet-stream" // Some browsers may use this for .xlsx files
+        };
+        if (!allowedTypes.Contains(file.ContentType))
+        {
+            return BadRequest("Type de fichier non supporté. Veuillez télécharger un fichier .xlsx.");
+        }
+
+        try
+        {
+            // Check ZIP signature
+            await using var stream = file.OpenReadStream();
+            var hdr = new byte[4];
+            var bytesRead = await stream.ReadAsync(hdr, ct);
+            if (bytesRead < 4)
+            {
+                return BadRequest("Le fichier téléchargé n'est pas un fichier .xlsx valide.");
+            }
+
+            var isZip =
+                hdr[0] == 0x50 && hdr[1] == 0x4B &&
+                (hdr[2] == 0x03 || hdr[2] == 0x05 || hdr[2] == 0x07) &&
+                (hdr[3] == 0x04 || hdr[3] == 0x06 || hdr[3] == 0x08);
+
+            if (!isZip)
+            {
+                return BadRequest("Le fichier téléchargé n'est pas un fichier .xlsx valide.");
+            }
+
+            // Check OOXML structure
+            stream.Position = 0;
+            using var zip = new ZipArchive(stream, ZipArchiveMode.Read, leaveOpen: false);
+            if (zip.GetEntry("[Content_Types].xml") == null || zip.GetEntry("xl/workbook.xml") == null)
+            {
+                return BadRequest("Le fichier téléchargé n'est pas un fichier .xlsx valide.");
+            }
+        }
+        catch (InvalidDataException)
+        {
+            return BadRequest("Archive .xlsx corrompue ou invalide.");
+        }
+
+        // Process
+        var result = await sender.Send(new ImportProductsCommand(file), ct);
+        return Ok(result);
+    }
+
+    [HttpGet("export")]
+    [Produces("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    public async Task<IActionResult> ExportProducts(CancellationToken ct)
+    {
+        var result = await sender.Send(new ExportProductsQuery(), ct);
+        return File(result.Content, result.ContentType, result.FileName);
+    }
 }

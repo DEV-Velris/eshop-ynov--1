@@ -18,20 +18,19 @@
     <ItemGroup>
         <PackageReference Include="AspNetCore.HealthChecks.NpgSql" Version="9.0.0" />
         <PackageReference Include="AspNetCore.HealthChecks.UI.Client" Version="9.0.0" />
+        <PackageReference Include="ClosedXML" Version="0.105.0" />
+        <PackageReference Include="ExcelDataReader" Version="3.8.0" />
+        <PackageReference Include="ExcelDataReader.DataSet" Version="3.8.0" />
         <PackageReference Include="Mapster" Version="7.4.0" />
         <PackageReference Include="Marten" Version="8.3.1" />
         <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="9.0.5"/>
+        <PackageReference Include="Scalar.AspNetCore" Version="2.8.11" />
     </ItemGroup>
 
     <ItemGroup>
       <Content Include="..\..\..\.dockerignore">
         <Link>.dockerignore</Link>
       </Content>
-    </ItemGroup>
-
-    <ItemGroup>
-      <Folder Include="Features\Products\Commands\" />
-      <Folder Include="Features\Products\Queries\" />
     </ItemGroup>
 
     <ItemGroup>

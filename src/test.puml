@@ -1,0 +1,78 @@
+@startuml
+title Catalog Service - Internal Composition (CQRS + Vertical Slice)
+skinparam componentStyle rectangle
+
+package "Catalog.API (ASP.NET Core)" {
+
+  package "API Layer" as Api {
+    component "ProductsController" as C_ProductsController <<REST>>
+    component "Swagger/OpenAPI" as C_Swagger <<Doc>>
+    component "Auth/JWT Middleware" as C_Auth <<Middleware>>
+  }
+
+  package "Application (CQRS)" as App {
+
+    package "Queries" as Q {
+      component "GetProductsQuery" as Q_GetProductsQuery <<Query>>
+      component "GetProductByIdQuery" as Q_GetProductByIdQuery <<Query>>
+      component "SearchProductsQuery" as Q_SearchProductsQuery <<Query>>
+
+      component "GetProductsHandler" as Q_GetProductsHandler <<Handler>>
+      component "GetProductByIdHandler" as Q_GetProductByIdHandler <<Handler>>
+      component "SearchProductsHandler" as Q_SearchProductsHandler <<Handler>>
+    }
+
+    package "Commands" as C {
+      component "CreateProductCommand" as C_CreateProductCommand <<Command>>
+      component "UpdateProductCommand" as C_UpdateProductCommand <<Command>>
+      component "DeleteProductCommand" as C_DeleteProductCommand <<Command>>
+
+      component "CreateProductHandler" as C_CreateProductHandler <<Handler>>
+      component "UpdateProductHandler" as C_UpdateProductHandler <<Handler>>
+      component "DeleteProductHandler" as C_DeleteProductHandler <<Handler>>
+    }
+
+    component "Validation Pipeline" as App_ValidationPipeline <<Behavior>>
+  }
+
+  
+
+  package "Infrastructure" as Infra {
+    component "ProductRepository" as I_ProductRepository <<Repository>>
+    component "EF Core DbContext" as I_DbContext <<ORM>>
+    database "PostgreSQL\nCatalogDB" as DB_Pg
+    component "Migrations" as I_Migrations <<Schema>>
+  }
+}
+
+Q_GetProductsQuery ..> Q_GetProductsHandler : carried by
+Q_GetProductByIdQuery ..> Q_GetProductByIdHandler : carried by
+Q_SearchProductsQuery ..> Q_SearchProductsHandler : carried by
+C_CreateProductCommand ..> C_CreateProductHandler : carried by
+C_UpdateProductCommand ..> C_UpdateProductHandler : carried by
+C_DeleteProductCommand ..> C_DeleteProductHandler : carried by
+
+' --- Relations internes ---
+C_ProductsController --> App
+
+
+Q_GetProductsHandler --> I_ProductRepository
+Q_GetProductByIdHandler --> I_ProductRepository
+Q_SearchProductsHandler --> I_ProductRepository
+
+C_CreateProductHandler --> I_ProductRepository
+C_UpdateProductHandler --> I_ProductRepository
+C_DeleteProductHandler --> I_ProductRepository
+
+I_ProductRepository --> I_DbContext
+I_DbContext --> DB_Pg
+I_Migrations ..> DB_Pg
+
+App_ValidationPipeline ..> C
+App_ValidationPipeline ..> Q
+
+' --- Bord du contexte ---
+component "API Gateway" as APIGW
+APIGW --> C_ProductsController : HTTP/REST
+
+@enduml
