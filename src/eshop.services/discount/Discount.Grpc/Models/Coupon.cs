@@ -32,9 +32,9 @@ public class Coupon
     
     public string? Category { get; set; }
     
-    public DateTimeOffset? StartsAt { get; set; }
+    public DateTime? StartsAt { get; set; }
     
-    public DateTimeOffset? ExpiresAt { get; set; }
+    public DateTime? ExpiresAt { get; set; }
     
     public bool IsActive { get; set; }
 }

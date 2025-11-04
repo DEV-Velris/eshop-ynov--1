@@ -37,7 +37,7 @@ namespace Discount.Grpc.Migrations
                         .IsRequired()
                         .HasColumnType("TEXT");
 
-                    b.Property<DateTimeOffset?>("ExpiresAt")
+                    b.Property<DateTime?>("ExpiresAt")
                         .HasColumnType("TEXT");
 
                     b.Property<bool>("IsActive")
@@ -50,7 +50,7 @@ namespace Discount.Grpc.Migrations
                         .IsRequired()
                         .HasColumnType("TEXT");
 
-                    b.Property<DateTimeOffset?>("StartsAt")
+                    b.Property<DateTime?>("StartsAt")
                         .HasColumnType("TEXT");
 
                     b.Property<int>("Type")

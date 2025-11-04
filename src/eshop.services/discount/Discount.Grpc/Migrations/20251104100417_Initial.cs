@@ -26,8 +26,8 @@ namespace Discount.Grpc.Migrations
                     Type = table.Column<int>(type: "INTEGER", nullable: false),
                     MaxPercentageCap = table.Column<decimal>(type: "TEXT", nullable: true),
                     Category = table.Column<string>(type: "TEXT", nullable: true),
-                    StartsAt = table.Column<DateTimeOffset>(type: "TEXT", nullable: true),
-                    ExpiresAt = table.Column<DateTimeOffset>(type: "TEXT", nullable: true),
+                    StartsAt = table.Column<DateTime>(type: "TEXT", nullable: true),
+                    ExpiresAt = table.Column<DateTime>(type: "TEXT", nullable: true),
                     IsActive = table.Column<bool>(type: "INTEGER", nullable: false)
                 },
                 constraints: table =>

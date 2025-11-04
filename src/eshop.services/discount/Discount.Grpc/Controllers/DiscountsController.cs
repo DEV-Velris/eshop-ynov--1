@@ -1,4 +1,3 @@
-// Controllers/DiscountsController.cs
 using Discount.Grpc.Data;
 using Discount.Grpc.Dtos;
 using Discount.Grpc.Models;
@@ -12,6 +11,85 @@ namespace Discount.Grpc.Controllers;
 [Produces("application/json")]
 public class DiscountsController(DiscountContext context) : ControllerBase
 {
+    /// <summary>
+    /// Crée un nouveau coupon de réduction
+    /// </summary>
+    /// <param name="request">Informations du coupon à créer</param>
+    /// <param name="cancellationToken"></param>
+    /// <returns>Le coupon créé</returns>
+    [HttpPost]
+    [ProducesResponseType(typeof(CouponDto), StatusCodes.Status201Created)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
+    public async Task<ActionResult<CouponDto>> CreateDiscount(
+        [FromBody] CreateDiscountRequestApi request,
+        CancellationToken cancellationToken)
+    {
+        var existingCoupon = await context.Coupons
+            .AsNoTracking()
+            .FirstOrDefaultAsync(c => c.Code == request.Code, cancellationToken);
+
+        if (existingCoupon is not null)
+        {
+            return Conflict(new { message = "Un coupon existe déjà pour ce produit" });
+        }
+
+        if (request is { StartDate: not null, EndDate: not null } &&
+            request.StartDate.Value >= request.EndDate.Value)
+        {
+            return BadRequest(new { message = "La date de début doit être antérieure à la date de fin" });
+        }
+
+        if (request is { DiscountType: CouponDiscountType.Amount, AmountOrPercentage: <= 0 })
+        {
+            return BadRequest(new
+                { message = "Le montant doit être supérieur à 0 pour une réduction en montant fixe" });
+        }
+
+        if (request is { DiscountType: CouponDiscountType.Percentage, AmountOrPercentage: <= 0 or > 10000 })
+        {
+            return BadRequest(new { message = "Le pourcentage doit être entre 0.01% et 100%" });
+        }
+
+        if (request.MaxPercentageCap.HasValue &&
+            (request.MaxPercentageCap.Value <= 0 || request.MaxPercentageCap.Value > 10000))
+        {
+            return BadRequest(new { message = "Le plafond de pourcentage doit être entre 0.01% et 100%" });
+        }
+
+        var coupon = new Coupon
+        {
+            ProductName = request.ProductName,
+            Description = request.Description,
+            Code = request.Code,
+            Amount = request.AmountOrPercentage,
+            Type = request.DiscountType,
+            StartsAt = request.StartDate,
+            ExpiresAt = request.EndDate,
+            Category = request.ProductCategory,
+            MaxPercentageCap = request.MaxPercentageCap
+        };
+
+        context.Coupons.Add(coupon);
+        await context.SaveChangesAsync(cancellationToken);
+
+        var dto = new CouponDto(
+            coupon.ProductName,
+            coupon.Description,
+            coupon.Amount,
+            coupon.Type,
+            coupon.StartsAt,
+            coupon.ExpiresAt,
+            coupon.Category,
+            coupon.MaxPercentageCap);
+
+        return CreatedAtAction(
+            nameof(GetProductDiscount),
+            new { productId = coupon.ProductName },
+            dto);
+    }
+
+
     /// <summary>
     /// Applique une réduction sur un produit
     /// </summary>
@@ -35,9 +113,11 @@ public class DiscountsController(DiscountContext context) : ControllerBase
         }
 
         var now = DateTime.UtcNow;
-        if (!IsValidCoupon(coupon, now, request.ProductCategory))
+        var validationResult = ValidateCoupon(coupon, now, request.ProductCategory);
+
+        if (!validationResult.IsValid)
         {
-            return NotFound(new { message = "La réduction n'est pas applicable" });
+            return BadRequest(new { message = validationResult.Reason });
         }
 
         var discountAmount = CalculateDiscount(coupon, request.Price);
@@ -67,7 +147,7 @@ public class DiscountsController(DiscountContext context) : ControllerBase
     {
         var coupon = await context.Coupons
             .AsNoTracking()
-            .FirstOrDefaultAsync(c => c.ProductName == code, cancellationToken);
+            .FirstOrDefaultAsync(c => c.Code == code, cancellationToken);
 
         if (coupon is null)
         {
@@ -84,7 +164,8 @@ public class DiscountsController(DiscountContext context) : ControllerBase
             coupon.Type,
             coupon.StartsAt,
             coupon.ExpiresAt,
-            coupon.Category);
+            coupon.Category,
+            coupon.MaxPercentageCap);
 
         return Ok(new ValidateDiscountResponse(validationResult.IsValid, validationResult.Reason, couponDto));
     }
@@ -118,25 +199,45 @@ public class DiscountsController(DiscountContext context) : ControllerBase
             coupon.Type,
             coupon.StartsAt,
             coupon.ExpiresAt,
-            coupon.Category);
+            coupon.Category,
+            coupon.MaxPercentageCap);
 
         return Ok(dto);
     }
 
-    private static bool IsValidCoupon(Coupon coupon, DateTime now, string? productCategory)
+    /// <summary>
+    /// Récupère tous les coupons actifs
+    /// </summary>
+    /// <param name="cancellationToken"></param>
+    /// <returns>Liste des coupons actifs</returns>
+    /// <summary>
+    /// Récupère tous les coupons actifs
+    /// </summary>
+    /// <param name="cancellationToken"></param>
+    /// <returns>Liste des coupons actifs</returns>
+    [HttpGet("active")]
+    [ProducesResponseType(typeof(IEnumerable<CouponDto>), StatusCodes.Status200OK)]
+    public async Task<ActionResult<IEnumerable<CouponDto>>> GetActiveDiscounts(
+        CancellationToken cancellationToken)
     {
-        if (coupon.StartsAt.HasValue && now < coupon.StartsAt.Value)
-            return false;
+        var now = DateTime.UtcNow;
+        var coupons = await context.Coupons
+            .AsNoTracking()
+            .Where(c => (c.StartsAt == null || c.StartsAt.Value <= now) &&
+                        (c.ExpiresAt == null || c.ExpiresAt.Value >= now))
+            .ToListAsync(cancellationToken);
 
-        if (coupon.ExpiresAt.HasValue && now > coupon.ExpiresAt.Value)
-            return false;
+        var dtos = coupons.Select(c => new CouponDto(
+            c.ProductName,
+            c.Description,
+            c.Amount,
+            c.Type,
+            c.StartsAt,
+            c.ExpiresAt,
+            c.Category,
+            c.MaxPercentageCap));
 
-        if (!string.IsNullOrEmpty(coupon.Category) &&
-            !string.IsNullOrEmpty(productCategory) &&
-            !string.Equals(coupon.Category, productCategory, StringComparison.OrdinalIgnoreCase))
-            return false;
-
-        return true;
+        return Ok(dtos);
     }
 
     private static (bool IsValid, string? Reason) ValidateCoupon(Coupon coupon, DateTime now, string? productCategory)
@@ -152,16 +253,31 @@ public class DiscountsController(DiscountContext context) : ControllerBase
             !string.Equals(coupon.Category, productCategory, StringComparison.OrdinalIgnoreCase))
             return (false, "Catégorie de produit non compatible");
 
+        if (coupon.Type == CouponDiscountType.Amount && coupon.Amount <= 0)
+            return (false, "Montant de réduction invalide");
+
+        if (coupon.Type == CouponDiscountType.Percentage && coupon.Amount <= 0)
+            return (false, "Pourcentage de réduction invalide");
+
         return (true, null);
     }
 
     private static decimal CalculateDiscount(Coupon coupon, decimal price)
     {
-        return coupon.Type switch
+        var discount = coupon.Type switch
         {
-            CouponDiscountType.Amount => coupon.Amount / 100m,
+            CouponDiscountType.Amount => price - coupon.Amount,
             CouponDiscountType.Percentage => price * coupon.Amount / 10000m,
             _ => 0m
         };
+
+        // Appliquer le plafond de pourcentage si défini
+        if (coupon.MaxPercentageCap.HasValue)
+        {
+            var maxDiscount = price * coupon.MaxPercentageCap.Value / 10000m;
+            discount = Math.Min(discount, maxDiscount);
+        }
+
+        return discount;
     }
 }

@@ -10,8 +10,9 @@ public record ValidateDiscountResponse(
 public record CouponDto(
     string ProductName,
     string? Description,
-    decimal AmountOrPercentage,
-    CouponDiscountType DiscountType,
-    DateTimeOffset? StartDate,
-    DateTimeOffset? EndDate,
-    string? ProductCategory);
+    decimal Amount,
+    CouponDiscountType Type,
+    DateTimeOffset? StartsAt,
+    DateTimeOffset? ExpiresAt,
+    string? Category,
+    decimal? MaxPercentageCap);
