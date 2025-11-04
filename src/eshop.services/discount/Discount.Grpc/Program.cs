@@ -7,6 +7,9 @@ var builder = WebApplication.CreateBuilder(args);
 
 var configuration = builder.Configuration;
 
+builder.Services.AddControllers();
+builder.Services.AddEndpointsApiExplorer();
+
 builder.Services.AddGrpc().AddJsonTranscoding();
 
 builder.Services.AddDbContext<DiscountContext>(options =>
@@ -17,6 +20,7 @@ var app = builder.Build();
 await app.UseCustomMigration();
 
 // Configure the HTTP request pipeline.
+app.MapControllers();
 app.MapGrpcService<DiscountServiceServer>();
 
 app.MapGet("/",
