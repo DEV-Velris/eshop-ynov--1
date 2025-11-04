@@ -15,12 +15,10 @@ public static class MigrationExtension
     /// </summary>
     /// <param name="app">The application builder instance used to configure the application's request pipeline.</param>
     /// <returns>Returns the <see cref="IApplicationBuilder"/> instance to allow for method chaining.</returns>
-    public static IApplicationBuilder UseCustomMigration(this IApplicationBuilder app)
+    public static async Task UseCustomMigration(this IApplicationBuilder app)
     {
         using var scope = app.ApplicationServices.CreateScope();
-        using var dbContext = scope.ServiceProvider.GetRequiredService<DiscountContext>();
-        dbContext.Database.MigrateAsync();
-        
-        return app;
+        await using var dbContext = scope.ServiceProvider.GetRequiredService<DiscountContext>();
+        await dbContext.Database.MigrateAsync();
     }
 }

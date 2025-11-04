@@ -113,16 +113,11 @@ public class DiscountServiceServer(DiscountContext dbContext, ILogger<DiscountSe
     public override async Task<DeleteDiscountResponse> DeleteDiscount(DeleteDiscountRequest request,
         ServerCallContext context)
     {
-        if (request.Coupon is null)
-            throw new RpcException(new Status(StatusCode.InvalidArgument, "Coupon is null"));
-
-        logger.LogInformation("Deleting discount for {ProductName}", request.Coupon.ProductName);
+        logger.LogInformation("Deleting discount for {id}", request.Id);
         
-        var coupon = await dbContext.Coupons.FirstOrDefaultAsync(x => x.ProductName == request.Coupon.ProductName 
-                                                                      || x.Id == request.Coupon.Id);
+        var coupon = await dbContext.Coupons.FirstOrDefaultAsync(x => x.Id == request.Id);
         if(coupon is null)
-            throw new RpcException(new Status(StatusCode.NotFound, $"Coupon with name {request.Coupon.ProductName} " +
-                                                                   $" or Id {request.Coupon.Id} not found"));
+            throw new RpcException(new Status(StatusCode.NotFound, $"Coupon with Id {request.Id} not found"));
         dbContext.Coupons.Remove(coupon);
         await dbContext.SaveChangesAsync();
         logger.LogInformation("Discount deleted for {ProductName}", coupon.ProductName);

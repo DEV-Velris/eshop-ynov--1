@@ -1,29 +1,64 @@
 syntax = "proto3";
 
+import "google/protobuf/timestamp.proto";
+import "google/api/annotations.proto";
 option csharp_namespace = "Discount.Grpc";
 
 package discount;
 
 // The discount service definition.
 service DiscountProtoService {
-  
+
   //Discount CRUD opérations
-  rpc GetDiscount (GetDiscountRequest) returns (CouponModel);
-  rpc CreateDiscount (CreateDiscountRequest) returns (CouponModel);
-  rpc UpdateDiscount (UpdateDiscountRequest) returns (CouponModel);
-  rpc DeleteDiscount (DeleteDiscountRequest) returns (DeleteDiscountResponse);
-  
+  rpc GetDiscount (GetDiscountRequest) returns (CouponModel) {
+    option (google.api.http) = {
+      get: "/discounts/{product_name}"
+    };
+  };
+  rpc CreateDiscount (CreateDiscountRequest) returns (CouponModel) {
+    option (google.api.http) = {
+      post: "/discounts",
+      body: "coupon"
+    };
+  };
+  rpc UpdateDiscount (UpdateDiscountRequest) returns (CouponModel) {
+    option (google.api.http) = {
+      put: "/discounts/{coupon.id}",
+      body: "coupon"
+    };
+  };
+  rpc DeleteDiscount (DeleteDiscountRequest) returns (DeleteDiscountResponse) {
+    option (google.api.http) = {
+      delete: "/discounts/{id}"
+    };
+  };
+
 }
 
 message GetDiscountRequest {
-  string productName = 1;
+  string product_name = 1;
+  optional string code = 2;
 }
 
 message CouponModel {
   int32 id = 1;
-  string productName = 2;
+  string product_name = 2;
   string description = 3;
-  double amount = 4;
+  string code = 4;
+  enum CouponDiscountType {
+    Amount = 0;
+    Percentage = 1;
+  }
+  CouponDiscountType discount_type = 5;
+  optional double max_percentage_cap = 6;
+  optional string category = 7;
+  optional google.protobuf.Timestamp starts_at = 8;
+  optional google.protobuf.Timestamp expires_at = 9;
+  bool is_active = 10;
+  oneof value {
+    int64 amount_in_minor = 11;
+    int32 percentage_bps = 12;
+  }
 }
 
 message CreateDiscountRequest {
@@ -35,7 +70,7 @@ message UpdateDiscountRequest {
 }
 
 message DeleteDiscountRequest {
-  CouponModel coupon = 1;
+  int32 id = 1;
 }
 
 message DeleteDiscountResponse {
