@@ -6,6 +6,7 @@ using HealthChecks.UI.Client;
 using Marten;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Scalar.AspNetCore;
+using Discount.Grpc;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -22,6 +23,21 @@ builder.Services.AddMediatR(config =>
     config.AddOpenBehavior(typeof(ValidationBehavior<,>));
     config.AddOpenBehavior(typeof(LoggingBehavior<,>));
 
+});
+
+builder.Services.AddGrpcClient<DiscountProtoService.DiscountProtoServiceClient>(options =>
+{
+    options.Address = new Uri(configuration.GetValue<string>("GrpcSettings:DiscountUrl") ?? string.Empty);   
+}).ConfigurePrimaryHttpMessageHandler (() =>
+{
+    var handler = new HttpClientHandler();
+    
+    if (builder.Environment.IsDevelopment())
+    {
+        handler.ServerCertificateCustomValidationCallback = 
+            HttpClientHandler.DangerousAcceptAnyServerCertificateValidator;
+    }
+    return handler;
 });
 
 builder.Services.AddValidatorsFromAssembly(typeof(Program).Assembly);

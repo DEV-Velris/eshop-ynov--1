@@ -9,7 +9,10 @@ namespace Basket.API.Features.Baskets.Commands.CreateBasket;
 /// Handles the creation of a shopping basket by processing the CreateBasketCommand.
 /// Implements the <see cref="ICommandHandler{CreateBasketCommand, CreateBasketCommandResult}"/> interface.
 /// </summary>
-public class CreateBasketCommandHandler(IBasketRepository repository, DiscountProtoService.DiscountProtoServiceClient discountProtoServiceClient) : ICommandHandler<CreateBasketCommand, CreateBasketCommandResult>
+public class CreateBasketCommandHandler(
+    IBasketRepository repository,
+    DiscountProtoService.DiscountProtoServiceClient discountProtoServiceClient)
+    : ICommandHandler<CreateBasketCommand, CreateBasketCommandResult>
 {
     /// <summary>
     /// Handles the request to create a shopping basket.
@@ -38,12 +41,42 @@ public class CreateBasketCommandHandler(IBasketRepository repository, DiscountPr
     /// <returns>A task that represents the asynchronous operation of applying discounts to the items.</returns>
     private async Task ApplyDiscountToItemAsync(ShoppingCart cart, CancellationToken cancellationToken)
     {
+        var now = DateTime.UtcNow;
+
         foreach (var item in cart.Items)
         {
             var coupon = await discountProtoServiceClient.GetDiscountAsync(new GetDiscountRequest
                 { ProductName = item.ProductName }, cancellationToken: cancellationToken);
-            
-            item.Price -= (decimal)coupon.Amount;
+
+            if (coupon is null or { AmountInMinor: 0, PercentageBps: 0 })
+                continue;
+
+            // Vérifier la validité temporelle du coupon
+            var startDate = coupon.StartsAt?.ToDateTime();
+            var endDate = coupon.ExpiresAt?.ToDateTime();
+
+            if (startDate.HasValue && now < startDate.Value)
+                continue;
+
+            if (endDate.HasValue && now > endDate.Value)
+                continue;
+
+            // Vérifier si la catégorie du produit correspond (si applicable)
+            if (!string.IsNullOrEmpty(coupon.Category) &&
+                !string.Equals(item.Category, coupon.Category, StringComparison.OrdinalIgnoreCase))
+                continue;
+
+            // Appliquer la réduction
+            if (coupon.DiscountType is CouponModel.Types.CouponDiscountType.Amount)
+            {
+                var discountAmount = coupon.AmountInMinor / 100m;
+                item.Price = Math.Max(0, item.Price - discountAmount);
+            }
+            else
+            {
+                var discountAmount = item.Price * coupon.PercentageBps / 10000m;
+                item.Price = Math.Max(0, item.Price - discountAmount);
+            }
         }
     }
 }
