@@ -21,7 +21,7 @@
     container_name: catalog_api
     build:
       context: .
-      dockerfile: eShop.Services/Catalog/Catalog.API/Dockerfile
+      dockerfile: eshop.services/catalog/Catalog.API/Dockerfile
     networks:
       - catalog_network
     depends_on:
@@ -39,7 +39,7 @@
     restart: always
     build:
       context: .
-      dockerfile: eShop.Services/Discount/Discount.Grpc/Dockerfile
+      dockerfile: eshop.services/discount/Discount.Grpc/Dockerfile
     networks:
       - discount_network
       - basket_network
@@ -63,7 +63,7 @@
     container_name: basket_api
     build:
       context: .
-      dockerfile: eShop.Services/Basket/Basket.API/Dockerfile
+      dockerfile: eshop.services/basket/Basket.API/Dockerfile
     networks:
       - basket_network
       - messageBroker_network
@@ -99,7 +99,7 @@
     container_name: ordering_api
     build:
       context: .
-      dockerfile: eShop.Services/Ordering/Ordering.API/Dockerfile
+      dockerfile: eshop.services/ordering/Ordering.API/Dockerfile
     networks:
       - ordering_network
       - messageBroker_network
