@@ -40,6 +40,8 @@
             <OutputDir>obj/Debug/net9.0/</OutputDir>
             <Generator>MSBuild:Compile</Generator>
         </Protobuf>
+        <Protobuf Include="google\api\http.proto"/>
+        <Protobuf Include="google\api\annotations.proto"/>
     </ItemGroup>
 
 </Project>
