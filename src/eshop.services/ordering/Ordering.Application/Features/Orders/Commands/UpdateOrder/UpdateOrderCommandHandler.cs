@@ -1,4 +1,6 @@
 using BuildingBlocks.CQRS;
+using BuildingBlocks.Messaging.Events;
+using MassTransit;
 using Microsoft.Extensions.Logging;
 using Ordering.Application.Features.Orders.Data;
 using Ordering.Domain.Exceptions;
@@ -10,7 +12,10 @@ namespace Ordering.Application.Features.Orders.Commands.UpdateOrder;
 /// This handler retrieves the specified order, updates it with new values, and persists the changes
 /// to the database. If the order does not exist, an exception is thrown.
 /// </summary>
-public class UpdateOrderCommandHandler(IOrderRepository orderRepository, ILogger<UpdateOrderCommandHandler> logger) 
+public class UpdateOrderCommandHandler(
+    IOrderRepository orderRepository, 
+    IPublishEndpoint publishEndpoint,
+    ILogger<UpdateOrderCommandHandler> logger) 
     : ICommandHandler<UpdateOrderCommand, UpdateOrderCommandResult>
 {
     public async Task<UpdateOrderCommandResult> Handle(UpdateOrderCommand request, CancellationToken cancellationToken)
@@ -25,10 +30,40 @@ public class UpdateOrderCommandHandler(IOrderRepository orderRepository, ILogger
             throw new OrderNotFoundException(message);
         }
 
+        logger.LogInformation("Domain events before update: {EventCount}", existingOrder.DomainEvents.Count);
+        
         UpdateOrderCommandMapper.UpdateOrderWithNewValues(existingOrder, request.Order);
+        
+        logger.LogInformation("Domain events after update: {EventCount}", existingOrder.DomainEvents.Count);
+        logger.LogInformation("Domain events: {Events}", string.Join(", ", existingOrder.DomainEvents.Select(e => e.GetType().Name)));
+        
         await orderRepository.UpdateAsync(existingOrder, cancellationToken);
         
         logger.LogInformation("Order {OrderId} updated successfully", request.Order.Id);
+
+        var orderUpdatedEvent = new OrderUpdatedEvent
+        {
+            OrderId = existingOrder.Id.Value,
+            CustomerId = existingOrder.CustomerId.Value,
+            OrderName = existingOrder.OrderName.Value,
+            OrderStatus = existingOrder.OrderStatus.ToString(),
+            PreviousStatus = "Updated",
+            TotalPrice = existingOrder.TotalPrice,
+            UpdatedDate = DateTime.UtcNow,
+            CustomerName = $"{existingOrder.ShippingAddress.FirstName} {existingOrder.ShippingAddress.LastName}",
+            CustomerEmail = existingOrder.ShippingAddress.EmailAddress,
+            OrderItems = existingOrder.OrderItems.Select(oi => new OrderItemEvent
+            {
+                ProductId = oi.ProductId.Value,
+                ProductName = $"Produit #{oi.ProductId.Value}",
+                Quantity = oi.Quantity,
+                Price = oi.Price
+            }).ToList()
+        };
+
+        await publishEndpoint.Publish(orderUpdatedEvent, cancellationToken);
+        
+        logger.LogInformation("🚀 OrderUpdatedEvent published for order {OrderId}", request.Order.Id);
 
         return new UpdateOrderCommandResult(true);
     }
