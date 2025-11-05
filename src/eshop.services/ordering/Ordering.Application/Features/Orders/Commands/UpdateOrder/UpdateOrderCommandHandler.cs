@@ -55,7 +55,7 @@ public class UpdateOrderCommandHandler(
             OrderItems = existingOrder.OrderItems.Select(oi => new OrderItemEvent
             {
                 ProductId = oi.ProductId.Value,
-                ProductName = $"Produit #{oi.ProductId.Value}",
+                ProductName = oi.ProductName,
                 Quantity = oi.Quantity,
                 Price = oi.Price
             }).ToList()

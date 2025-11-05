@@ -44,7 +44,7 @@ public class OrderCreatedEventConsumer(
         
         var itemsHtml = string.Join("", orderEvent.OrderItems.Select(item => 
             $@"<tr>
-                <td>Produit #{item.ProductId}</td>
+                <td>{item.ProductName}</td>
                 <td style='text-align: center;'>{item.Quantity}</td>
                 <td>{item.Price.ToString("C", frenchCulture)}</td>
                 <td style='font-weight: 600;'>{(item.Price * item.Quantity).ToString("C", frenchCulture)}</td>
