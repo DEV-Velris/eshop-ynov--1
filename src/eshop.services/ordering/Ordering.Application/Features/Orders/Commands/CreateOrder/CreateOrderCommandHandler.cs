@@ -45,6 +45,7 @@ public class CreateOrderCommandHandler(
             OrderItems = [.. order.OrderItems.Select(oi => new OrderItemEvent
             {
                 ProductId = oi.ProductId.Value,
+                ProductName = oi.ProductName,
                 Quantity = oi.Quantity,
                 Price = oi.Price
             })]

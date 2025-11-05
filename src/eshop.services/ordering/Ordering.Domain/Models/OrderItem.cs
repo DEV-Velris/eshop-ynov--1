@@ -11,16 +11,19 @@ public class OrderItem : Entity<OrderItemId>
 {
     public ProductId ProductId { get; set; }
 
+    public string ProductName { get; set; } = null!;
+
     public OrderId OrderId { get; set; }
 
     public decimal Price { get; set; }
 
     public int Quantity { get; set; }
 
-    internal OrderItem(ProductId productId, OrderId orderId, decimal price, int quantity)
+    internal OrderItem(ProductId productId, string productName, OrderId orderId, decimal price, int quantity)
     {
         Id = OrderItemId.Of(Guid.NewGuid());
         ProductId = productId;
+        ProductName = productName;
         OrderId = orderId;
         Price = price;
         Quantity = quantity;

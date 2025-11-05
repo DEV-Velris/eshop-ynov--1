@@ -49,8 +49,8 @@ public static class OrderMapperExtensions
             OrderStatus: Ordering.Domain.Enums.OrderStatus.Pending,
             OrderItems:
             [
-                new OrderItemDto(orderId, new Guid("5334c996-8457-4cf0-815c-ed2b77c4ff61"), 2, 500),
-                new OrderItemDto(orderId, new Guid("c67d6323-e8b1-4bdf-9a75-b0d0d2e7e914"), 1, 400)
+                new OrderItemDto(orderId, new Guid("5334c996-8457-4cf0-815c-ed2b77c4ff61"), "Product Sample 1", 2, 500),
+                new OrderItemDto(orderId, new Guid("c67d6323-e8b1-4bdf-9a75-b0d0d2e7e914"), "Product Sample 2", 1, 400)
             ]);
 
         return new CreateOrderCommand(orderDto);
@@ -77,7 +77,7 @@ public static class OrderMapperExtensions
                 order.Payment.CVV, order.Payment.PaymentMethod),
             OrderStatus: order.OrderStatus,
             OrderItems: order.OrderItems.Select(oi =>
-                new OrderItemDto(oi.OrderId.Value, oi.ProductId.Value, oi.Quantity, oi.Price)).ToList()
+                new OrderItemDto(oi.OrderId.Value, oi.ProductId.Value, oi.ProductName, oi.Quantity, oi.Price)).ToList()
         );
     }
     
