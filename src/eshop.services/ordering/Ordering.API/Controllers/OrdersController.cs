@@ -4,6 +4,8 @@ using Ordering.Application.Features.Orders.Commands.CreateOrder;
 using Ordering.Application.Features.Orders.Commands.DeleteOrder;
 using Ordering.Application.Features.Orders.Commands.UpdateOrder;
 using Ordering.Application.Features.Orders.Dtos;
+using Ordering.Application.Features.Orders.Queries.GetOrder;
+using Ordering.Application.Features.Orders.Queries.GetOrders;
 
 namespace Ordering.API.Controllers;
 
@@ -26,8 +28,8 @@ public class OrdersController(ISender sender) : ControllerBase
     [ProducesResponseType(typeof(NotFoundObjectResult), StatusCodes.Status404NotFound)]
     public async Task<ActionResult<IEnumerable<OrderDto>>> GetOrdersByName(string name)
     {
-        // TODO
-        return Ok();
+        var result = await sender.Send(new GetOrderQuery(name));
+        return Ok(result.Order);
     }
 
     /// <summary>
@@ -56,8 +58,8 @@ public class OrdersController(ISender sender) : ControllerBase
     [ProducesResponseType(typeof(NotFoundObjectResult), StatusCodes.Status404NotFound)]
     public async Task<ActionResult<IEnumerable<OrderDto>>> GetOrders([FromQuery] int pageIndex ,[FromQuery]  int pageSize)
     {
-        // TODO
-        return Ok();
+            var result = await sender.Send(new GetOrdersQuery(pageIndex, pageSize)); 
+            return Ok(result.Orders);
     }
 
     /// <summary>
