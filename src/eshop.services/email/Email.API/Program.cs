@@ -15,6 +15,7 @@ builder.Services.AddMassTransit(config =>
     // Add Consumers
     config.AddConsumer<OrderCreatedEventConsumer>();
     config.AddConsumer<OrderUpdatedEventConsumer>();
+    config.AddConsumer<OrderDeletedEventConsumer>();
     
     config.UsingRabbitMq((context, cfg) =>
     {
