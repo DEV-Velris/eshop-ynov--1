@@ -147,3 +147,11 @@
     environment:
       - MP_SMTP_AUTH_ACCEPT_ANY=1
       - MP_SMTP_AUTH_ALLOW_INSECURE=1
+        
+  ### API Gateway ###    
+
+  yarpapigateway:
+    ports:
+      - "6065:${GATEWAY_API_PORT}" #http
+    environment:
+      - ASPNETCORE_HTTP_PORTS=${GATEWAY_API_PORT}

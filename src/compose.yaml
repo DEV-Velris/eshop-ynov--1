@@ -157,6 +157,34 @@
       - EmailSettings__SmtpPort=1025
       - EmailSettings__EnableSsl=false
 
+  ### API Gateway ###    
+  
+  yarpapigateway:
+    image: yarpapigateway
+    container_name: yarpapigateway
+    build:
+      context: .
+      dockerfile: eshop.gateway/YarpApiGateway/Dockerfile
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+    networks:
+      - ordering_network
+      - basket_network
+      - catalog_network
+    depends_on:
+      ordering.api:
+        condition: service_started
+        required: true
+        restart: true
+      basket.api:
+        condition: service_started
+        required: true
+        restart: true
+      catalog.api:
+        condition: service_started
+        required: true
+        restart: true
+
 ### Shared infrastructure ###
 volumes:
   catalog_data:
@@ -171,7 +199,6 @@ volumes:
     name: messageBroker_data
   messageBroker_logs:
     name: messageBroker_logs
-
 
 networks:
   catalog_network:
