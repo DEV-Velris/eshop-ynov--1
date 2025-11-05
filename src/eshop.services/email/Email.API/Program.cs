@@ -4,29 +4,27 @@ using MassTransit;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Services de base
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
-// Service d'email
 builder.Services.AddScoped<IEmailService, EmailService>();
 
-// Configuration MassTransit pour écouter les événements
 builder.Services.AddMassTransit(config =>
 {
-    // Ajouter le consumer
+    // Add Consumers
     config.AddConsumer<OrderCreatedEventConsumer>();
+    config.AddConsumer<OrderUpdatedEventConsumer>();
     
     config.UsingRabbitMq((context, cfg) =>
     {
-        // Configuration RabbitMQ
+        // Configure RabbitMQ
         var connectionString = builder.Configuration.GetConnectionString("MessageBroker") 
             ?? "amqp://guest:guest@messageBroker:5672";
             
         cfg.Host(new Uri(connectionString));
         
-        // Configuration des retries en cas d'erreur
+        // Configure message retries
         cfg.UseMessageRetry(retry => retry.Exponential(
             retryLimit: 3,
             minInterval: TimeSpan.FromSeconds(2),
@@ -34,7 +32,7 @@ builder.Services.AddMassTransit(config =>
             intervalDelta: TimeSpan.FromSeconds(2)
         ));
         
-        // Configuration automatique des endpoints
+        // Auto-configure endpoints for all consumers
         cfg.ConfigureEndpoints(context);
     });
 });
